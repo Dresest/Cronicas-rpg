@@ -1,8 +1,15 @@
 {
-  "crons": [
-    { "path": "/api/database-health", "schedule": "0 9 * * 0" }
-  ],
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/|assets/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/database-health",
+      "schedule": "0 9 * * *"
+    }
   ]
 }

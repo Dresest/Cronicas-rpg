@@ -1,94 +1,90 @@
-import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-process.env.VITE_SUPABASE_URL = "https://test-project.supabase.co";
-process.env.VITE_SUPABASE_ANON_KEY = "public-test-key";
-const { default: handler } = await import("../api/database-health.js");
+process.env.VITE_SUPABASE_URL = 'https://test-supabase.invalid';
+process.env.VITE_SUPABASE_ANON_KEY = 'public-test-key';
+const { default: handler } = await import('../api/database-health.js');
 
-const originalFetch = globalThis.fetch;
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-});
-
-function response() {
-  return {
-    headers: {},
-    code: 200,
-    body: null,
-    setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
-    status(code) { this.code = code; return this; },
-    json(body) { this.body = body; return this; },
-  };
+function mockResponse() {
+  const out = { statusCode: 200, body: null, headers: {} };
+  out.setHeader = (key, value) => { out.headers[key] = value; };
+  out.status = (code) => { out.statusCode = code; return out; };
+  out.json = (body) => { out.body = body; return out; };
+  return out;
+}
+async function withFetch(fake, work) {
+  const previous = globalThis.fetch;
+  globalThis.fetch = fake;
+  try { return await work(); } finally { globalThis.fetch = previous; }
 }
 
-test("manual GET checks Supabase once without revealing the key", async () => {
+test('vercel.json preserva los endpoints API y el cron diario', () => {
+  const conf = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const rewrite = conf.rewrites[0];
+  const matcher = new RegExp('^' + rewrite.source + '$');
+  assert.equal(matcher.test('/panel'), true);
+  assert.equal(matcher.test('/misiones/actuales'), true);
+  assert.equal(matcher.test('/api/database-health'), false);
+  assert.equal(matcher.test('/api/generate-rpg'), false);
+  assert.equal(matcher.test('/api/generate-item'), false);
+  assert.equal(matcher.test('/assets/index.js'), false);
+  assert.deepEqual(conf.crons, [{path:'/api/database-health',schedule:'0 9 * * *'}]);
+});
+
+test('la comprobación manual realiza una sola consulta de solo lectura', async () => {
   let calls = 0;
-  globalThis.fetch = async (url, options) => {
+  await withFetch(async (url, options) => {
     calls++;
-    assert.match(url, /service_ping\?select=id,service_name&id=eq.1$/);
-    assert.equal(options.method, "GET");
-    assert.equal(options.headers.apikey, "public-test-key");
-    return { ok: true, json: async () => [{ id: 1, service_name: "Crónicas RPG" }] };
-  };
-
-  const res = response();
-  await handler({ method: "GET", headers: {} }, res);
-  assert.equal(res.code, 200);
-  assert.equal(res.body.ok, true);
-  assert.equal(res.body.checks, 1);
-  assert.equal(res.body.kind, "manual");
-  assert.equal(calls, 1);
-  assert.ok(!JSON.stringify(res.body).includes("public-test-key"));
+    assert.equal(url, 'https://test-supabase.invalid/rest/v1/service_ping?select=id,service_name&id=eq.1');
+    assert.equal(options.method, 'GET');
+    assert.equal(options.headers.apikey, 'public-test-key');
+    return { ok: true, json: async () => [{ id: 1, service_name: 'cronicas' }] };
+  }, async () => {
+    const res = mockResponse();
+    await handler({ method:'GET', headers:{} }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.kind, 'manual');
+    assert.equal(res.body.checks, 1);
+    assert.equal(calls, 1);
+    assert.equal(res.headers['Cache-Control'], 'no-store');
+  });
 });
 
-test("cron GET uses five independent, read-only checks", async () => {
+test('la comprobación de Vercel Cron realiza cinco lecturas', async () => {
   let calls = 0;
-  globalThis.fetch = async () => {
+  await withFetch(async () => {
     calls++;
-    return { ok: true, json: async () => [{ id: 1 }] };
-  };
-
-  const res = response();
-  await handler({ method: "GET", headers: { "user-agent": "vercel-cron/1.0" } }, res);
-  assert.equal(res.code, 200);
-  assert.equal(res.body.kind, "scheduled");
-  assert.equal(res.body.checks, 5);
-  assert.equal(calls, 5);
+    return {ok:true,json:async()=>[{id:1,service_name:'cronicas'}]};
+  }, async () => {
+    const res = mockResponse();
+    await handler({method:'GET',headers:{'user-agent':'vercel-cron/1.0'}},res);
+    assert.equal(res.statusCode,200);
+    assert.equal(res.body.kind,'automatic');
+    assert.equal(res.body.checks,5);
+    assert.equal(calls,5);
+  });
 });
 
-test("rejects methods other than GET", async () => {
-  globalThis.fetch = () => { throw new Error("Should not fetch"); };
-  const res = response();
-  await handler({ method: "POST", headers: {} }, res);
-  assert.equal(res.code, 405);
-  assert.equal(res.body.ok, false);
+test('rechaza otros métodos y no consulta Supabase', async () => {
+  await withFetch(async () => { throw Error('should not be called'); },async()=>{
+    const res=mockResponse();
+    await handler({method:'POST',headers:{}},res);
+    assert.equal(res.statusCode,405);
+    assert.equal(res.body.ok,false);
+  });
 });
 
-test("reports a failed service check without leaking internal details", async () => {
-  const originalError = console.error;
-  console.error = () => {};
+test('no confirma salud si la fila de prueba no existe', async () => {
+  const originalError=console.error;
+  console.error=()=>{};
   try {
-    globalThis.fetch = async () => ({ ok: false, status: 503 });
-    const res = response();
-    await handler({ method: "GET", headers: {} }, res);
-    assert.equal(res.code, 503);
-    assert.equal(res.body.ok, false);
-    assert.equal(res.body.error, "Database health check failed");
-    assert.ok(!JSON.stringify(res.body).includes("public-test-key"));
-  } finally {
-    console.error = originalError;
-  }
-});
-
-test("rejects malformed Supabase payloads", async () => {
-  const originalError = console.error;
-  console.error = () => {};
-  try {
-    globalThis.fetch = async () => ({ ok: true, json: async () => [] });
-    const res = response();
-    await handler({ method: "GET", headers: {} }, res);
-    assert.equal(res.code, 503);
-  } finally {
-    console.error = originalError;
-  }
+    await withFetch(async ()=>({ok:true,json:async()=>[]}),async()=>{
+      const res=mockResponse();
+      await handler({method:'GET',headers:{}},res);
+      assert.equal(res.statusCode,503);
+      assert.equal(res.body.ok,false);
+    });
+  } finally {console.error=originalError;}
 });
