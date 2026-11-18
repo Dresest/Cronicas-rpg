@@ -19,7 +19,9 @@ jobs:
           node-version: "22"
       - name: Instalar dependencias
         run: npm install --no-audit --no-fund
-      - name: Probar health check y reglas de ruta
-        run: node --test tests/*.test.mjs
       - name: Verificar TypeScript y compilar Vite
         run: npm run build
+      - name: Comprobar sintaxis de la función de servidor
+        run: node --check api/database-health.js
+      - name: Probar servicio y rutas sin conexiones externas
+        run: npm run test:server
