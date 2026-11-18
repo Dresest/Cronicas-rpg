@@ -25,3 +25,28 @@ jobs:
         run: node --check api/database-health.js
       - name: Probar servicio y rutas sin conexiones externas
         run: npm run test:server
+
+  quota-sql:
+    name: Validar cuotas IA en PostgreSQL temporal
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_only_password
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d testdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: test_only_password
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Comprobar migración de créditos en base aislada
+        run: psql -h localhost -U postgres -d testdb -v ON_ERROR_STOP=1 -f sql/test_ai_generation_quota.sql
