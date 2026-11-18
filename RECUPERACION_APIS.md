@@ -22,3 +22,7 @@
 5. **Pruebas funcionales:** pendientes en vista previa de Vercel antes de cualquier publicación.
 
 **No publicar sobre producción ni conectar Vercel automáticamente hasta resolver estos puntos.**
+
+## Barrera de despliegue
+
+La configuración `vercel.json` ejecuta `npm run build:production`, que exige `RPG_RELEASE_APPROVED=true` y todos los módulos de servidor. Sin esa autorización explícita el despliegue falla antes de publicarse, incluso si se vincula GitHub accidentalmente. La CI de desarrollo continúa compilando con `npm run build` para permitir pruebas sin habilitar producción.

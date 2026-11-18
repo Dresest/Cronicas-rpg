@@ -19,3 +19,9 @@ if (missing.length > 0) {
 } else {
   console.log("Los archivos requeridos existen. Aun debes ejecutar pruebas funcionales antes de producción.");
 }
+
+if (process.env.RPG_RELEASE_APPROVED !== "true") {
+  console.error("BLOQUEADO: falta revisión y autorización explícita de publicación.");
+  console.error("Las APIs de IA, cuotas y frontend aún no se han validado en un entorno aislado.");
+  process.exitCode = 1;
+}
