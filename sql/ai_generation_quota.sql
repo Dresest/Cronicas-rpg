@@ -30,6 +30,10 @@ ALTER TABLE private.ai_generation_reservations ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.ai_generation_usage FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON private.ai_generation_reservations FROM PUBLIC, anon, authenticated;
 
+-- Retirar la firma antigua con un solo parámetro: permitía acceso directo
+-- desde usuarios autenticados y no implementaba devolución de reservas.
+DROP FUNCTION IF EXISTS public.reserve_ai_generation(text);
+
 CREATE OR REPLACE FUNCTION public.reserve_ai_generation(p_user_id uuid,p_kind text)
 RETURNS jsonb
 LANGUAGE plpgsql

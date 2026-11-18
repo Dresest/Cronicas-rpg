@@ -14,10 +14,17 @@ INSERT INTO public.profiles(id,role) VALUES
 ('22222222-2222-2222-2222-222222222222','jugador'),
 ('33333333-3333-3333-3333-333333333333','adminInformatico');
 
+-- Simular una instalación previa para demostrar que se cierra su ruta insegura.
+CREATE FUNCTION public.reserve_ai_generation(p_kind text)
+RETURNS jsonb LANGUAGE sql AS $ SELECT '{}'::jsonb $;
+GRANT EXECUTE ON FUNCTION public.reserve_ai_generation(text) TO authenticated;
+
 \i sql/ai_generation_quota.sql
 
 DO $acl$
 BEGIN
+ IF to_regprocedure('public.reserve_ai_generation(text)') IS NOT NULL THEN
+   RAISE EXCEPTION 'La función antigua no se eliminó'; END IF;
  IF has_function_privilege('anon','public.reserve_ai_generation(uuid,text)','EXECUTE')
  OR has_function_privilege('authenticated','public.reserve_ai_generation(uuid,text)','EXECUTE')
  OR has_function_privilege('anon','public.settle_ai_generation(uuid,boolean)','EXECUTE')
