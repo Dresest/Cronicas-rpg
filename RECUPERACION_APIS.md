@@ -3,7 +3,7 @@
 ## Recuperado de forma funcional (reconstrucción, no copia idéntica)
 
 - `api/database-health.js`: comprueba `public.service_ping` mediante la clave publicable de Supabase, con peticiones de solo lectura, un tiempo de espera y respuesta JSON sin credenciales. La consulta manual realiza una lectura y la invocación de Vercel Cron, cinco.
-- `vercel.json`: conserva la tarea programada de producción `0 9 * * 0` (domingo a las 09:00 UTC) y evita que el fallback SPA intercepte las rutas `/api/*` o `/assets/*`.
+- `vercel.json`: conserva la tarea programada de producción `0 9 * * *` (todos los días a las 09:00 UTC) y evita que el fallback SPA intercepte las rutas `/api/*` o `/assets/*`.
 - `tests/database-health.test.mjs`: ejecuta pruebas de método HTTP, estado correcto, fallo del servicio y cinco lecturas programadas sin contactar Supabase real.
 
 ## Pendiente

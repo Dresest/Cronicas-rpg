@@ -19,6 +19,9 @@ jobs:
           node-version: "22"
       - name: Instalar dependencias
         run: npm install --no-audit --no-fund
+      - name: Diagnostico de recursos publicos en produccion (solo lectura)
+        run: node scripts/inspect-production.mjs
+        continue-on-error: true
       - name: Verificar TypeScript y compilar Vite
         run: npm run build
       - name: Comprobar sintaxis de la función de servidor
