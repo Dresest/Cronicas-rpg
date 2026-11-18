@@ -63,8 +63,8 @@ async function runRole(browser,role){
  page.on('pageerror',e=>pageErrors.push(e.message));
  try{
   await page.goto(WEB,{waitUntil:'domcontentloaded'});
-  await page.locator('.role-chip').waitFor({timeout:14000});
-  const roleLabel=await page.locator('.role-chip').innerText();
+  await page.locator('.role-chip').waitFor({state:'attached',timeout:14000});
+  const roleLabel=await page.locator('.role-chip').textContent();
   if(role==='jugador'){
     assert.match(roleLabel,/Jugador/);
     await page.locator('nav.mobile-bottom-nav button').first().waitFor();
