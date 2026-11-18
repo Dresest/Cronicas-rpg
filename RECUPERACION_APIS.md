@@ -18,7 +18,7 @@
 1. **Autorización y créditos originales:** no se recuperó su lógica completa, solo la interfaz. Requiere validación de reglas con el usuario y presupuesto de AI Gateway.
 2. **SQL de cuotas pendiente:** no se ha desplegado ni validado en una base de prueba.
 3. **IA real:** ninguna solicitud al modelo se ha ejecutado. Son únicamente pruebas con respuestas simuladas.
-4. **Frontend:** el respaldo React v1.3.4 carece de la interfaz de generación con IA añadida posteriormente, que aún debe reimplementarse/reconciliarse.
+4. **Frontend:** se recuperaron botones «Crear con IA» en objetos y habilidades, con vista previa editable, pero falta comparar y probar el resto del flujo con producción.
 5. **Pruebas funcionales:** pendientes en vista previa de Vercel antes de cualquier publicación.
 
 **No publicar sobre producción ni conectar Vercel automáticamente hasta resolver estos puntos.**

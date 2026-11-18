@@ -6,22 +6,29 @@
 
 Fuente React + TypeScript + Vite v1.3.4 (26-10-2026), con las correcciones de estabilidad en la rama de trabajo. Vercel ejecuta un paquete compilado posterior al respaldo y sus diferencias exactas todavía no han sido conciliadas.
 
-## Funciones de servidor
+## Funciones de servidor reimplementadas en la rama de desarrollo
 
-| Ruta de producción | Estado del código fuente |
+| Ruta de producción | Estado en esta rama |
 |---|---|
-| `api/database-health.js` | **Reimplementación equivalente preparada** usando la fuente parcial verificable de Vercel, con pruebas unitarias y sin escrituras |
-| `api/generate-item.js` | Pendiente de recuperar/reconstruir el cuerpo íntegro; no se incorpora un reemplazo incompleto |
-| `api/generate-rpg.js` | Pendiente de recuperar/reconstruir el cuerpo íntegro; no se incorpora un reemplazo incompleto |
+| `api/database-health.js` | Reconstrucción funcional probada con datos simulados |
+| `api/generate-rpg.js` | Implementación nueva con Supabase Auth, cuotas obligatorias y generación JSON |
+| `api/generate-item.js` | Alias de compatibilidad con el generador de objetos |
 
-La herramienta de inspección de Vercel devuelve fragmentos truncados del código de los generadores de IA. Su reconstrucción exacta sin las fuentes completas sería especulativa, por lo que se conservan funcionando exclusivamente en el despliegue actual.
+Los endpoints **no son copias exactas** del código de Vercel, ya que la herramienta de inspección entrega su fuente original truncada. Las cuotas originales y otras reglas de créditos no están completamente verificadas.
 
-## Corrección importante de Vercel
+## Interfaz React con IA
 
-Se identificó que el respaldo antiguo contiene una regla SPA que podría redirigir solicitudes `/api/*` a `index.html`. Se corrigió excluyendo explícitamente `api/` y `assets/` de la reescritura y se restauró la definición del cron diario **`0 9 * * *` (UTC)** presente en la configuración del despliegue real. Se añadieron pruebas para comprobar las rutas.
+La rama recupera botones «Crear con IA» en catálogo de objetos y habilidades del DM. Los resultados abren el editor habitual como borrador y el guardado requiere confirmación manual. La aplicación publicada usa el mismo contrato `POST /api/generate-rpg`, pero no se han realizado pruebas integradas de esta reconstrucción.
 
-## Condiciones de publicación
+## Requisitos de publicación no cumplidos todavía
 
-**NO fusionar el PR ni conectar la rama a producción todavía.** Antes hay que recuperar ambos generadores IA, validar la interfaz actual, ejecutar pruebas de los roles jugador/DM/adminInformatico y realizar una vista previa aislada de escrituras. La ejecución automatizada de tests no sustituye una prueba de despliegue en Vercel.
+1. Validar el límite propuesto de 5 solicitudes por tipo y mes, y los roles autorizados.
+2. Probar `sql/ai_generation_quota.sql` en una base aislada antes de aplicarlo a Supabase.
+3. Configurar presupuesto de AI Gateway y probar una solicitud real controlada con el modelo.
+4. Probar la interfaz con perfiles jugador, dungeonMaster y adminInformatico.
+5. Comparar los flujos actuales de producción que pudieran faltar en el código React recuperado.
+6. Publicar una vista previa aislada y probar sin alterar personajes ni recursos reales.
 
-No se modificó la instancia real de Vercel ni la base de datos Supabase con este commit.
+**La configuración de Vercel ejecutará `npm run build:production`**. Ese comando exige la variable `RPG_RELEASE_APPROVED=true`, ausente por defecto, para impedir despliegues inadvertidos desde este código incompleto.
+
+No se ha modificado la instancia de producción de Vercel ni la base de datos Supabase.

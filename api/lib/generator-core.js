@@ -41,7 +41,7 @@ function normalizeItem(o){
   const dmg=category==='arma'&&!attributeBonus?clamp(o.damage_bonus,0,10):0;
   const useResource=choose(o.use_resource,RESOURCES,null);
   return {
-    name:text(o.name,80)||'Objeto sin nombre',
+    name:text(o.name,70)||'Objeto sin nombre',
     description:text(o.description,800),
     category,
     rarity:choose(o.rarity,RARITIES,'comun'),
@@ -57,7 +57,7 @@ function normalizeSkill(o){
   const kind=choose(o.kind,['activa','pasiva'],'activa');
   const resource=kind==='activa'?choose(o.resource_name,RESOURCES,null):null;
   return {
-    name:text(o.name,80)||'Habilidad sin nombre',
+    name:text(o.name,70)||'Habilidad sin nombre',
     description:text(o.description,800),
     kind,resource_name:resource,
     resource_cost:resource?clamp(o.resource_cost,0,100):0,
