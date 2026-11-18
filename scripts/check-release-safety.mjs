@@ -25,3 +25,10 @@ if (process.env.RPG_RELEASE_APPROVED !== "true") {
   console.error("Las APIs de IA, cuotas y frontend aún no se han validado en un entorno aislado.");
   process.exitCode = 1;
 }
+
+if (process.env.RPG_RELEASE_APPROVED === "true" &&
+    (process.env.AI_GENERATION_ENABLED !== "true" ||
+     process.env.VITE_AI_GENERATION_ENABLED !== "true")) {
+  console.error("BLOQUEADO: la interfaz y la API de generación de IA deben estar habilitadas juntas.");
+  process.exitCode = 1;
+}

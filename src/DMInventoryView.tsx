@@ -17,6 +17,7 @@ const categories = [
  {id:'otros',label:'Otros objetos',matches:(i:ItemDefinition)=>i.category==='objeto'&&i.restore_amount<=0&&!/\bcuerda\b/i.test(i.name)},
  {id:'clave',label:'Objetos clave',matches:(i:ItemDefinition)=>i.category==='clave'},
 ] as const
+const aiUiEnabled=import.meta.env.VITE_AI_GENERATION_ENABLED==='true'
 const rarityLabels:Record<ItemDefinition['rarity'],string>={comun:'Común',poco_comun:'Poco común',raro:'Raro',epico:'Épico',legendario:'Legendario'}
 
 type Props={
@@ -58,7 +59,7 @@ export function DMInventoryView({characters,profiles,selectedCharacter,items,own
   if(await onBulkGrant(toGive.id,selectedRecipients.map(x=>x.id),amount))closeGive()
  }
  return <div className="stack dm-inventory-page">
-  <div className="page-heading dm-inventory-heading"><div><span className="overline">DUNGEON MASTER · GESTIÓN</span><h1>Catálogo de objetos</h1><p>Busca un objeto, elige los personajes y entrégalo en segundos.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="inv-button subtle" onClick={()=>setAiOpen(true)} type="button"><WandSparkles size={18}/> Crear con IA</button><button className="inv-button primary" onClick={()=>{setAiItem(null);setEditor(null)}} type="button"><Plus size={18}/> Crear objeto</button></div></div>
+  <div className="page-heading dm-inventory-heading"><div><span className="overline">DUNGEON MASTER · GESTIÓN</span><h1>Catálogo de objetos</h1><p>Busca un objeto, elige los personajes y entrégalo en segundos.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{aiUiEnabled&&<button className="inv-button subtle" onClick={()=>setAiOpen(true)} type="button"><WandSparkles size={18}/> Crear con IA</button>}<button className="inv-button primary" onClick={()=>{setAiItem(null);setEditor(null)}} type="button"><Plus size={18}/> Crear objeto</button></div></div>
   <div className="dm-quick-guide"><ShieldCheck size={19}/><span><strong>Entrega rápida:</strong> escoge una categoría → pulsa <b>Dar</b> → selecciona jugadores → confirma.</span><span className="dm-count">{items.length} objetos</span></div>
   <label className="inv-search dm-search"><Search size={19}/><input value={search} onChange={e=>{setSearch(e.target.value);if(e.target.value.trim())setCategory('all')}} placeholder="Buscar por nombre, efecto o rareza…" aria-label="Buscar objetos del catálogo"/>{search&&<button type="button" onClick={()=>setSearch('')} title="Limpiar búsqueda" aria-label="Limpiar búsqueda"><X size={17}/></button>}</label>
   <div className="dm-category-tabs" role="group" aria-label="Filtrar objetos por tipo">

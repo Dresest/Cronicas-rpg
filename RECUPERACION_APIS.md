@@ -26,3 +26,7 @@
 ## Barrera de despliegue
 
 La configuración `vercel.json` ejecuta `npm run build:production`, que exige `RPG_RELEASE_APPROVED=true` y todos los módulos de servidor. Sin esa autorización explícita el despliegue falla antes de publicarse, incluso si se vincula GitHub accidentalmente. La CI de desarrollo continúa compilando con `npm run build` para permitir pruebas sin habilitar producción.
+
+## Visibilidad de IA por entorno
+
+Los botones «Crear con IA» solo aparecen al activar **`VITE_AI_GENERATION_ENABLED=true`**. El endpoint requiere también **`AI_GENERATION_ENABLED=true`**. Ambas variables están desactivadas por defecto para que las vistas previas no muestren botones inoperativos. La guardia de publicación exige ambas habilitadas cuando `RPG_RELEASE_APPROVED=true`, evitando perder las funciones de IA al sustituir producción.
