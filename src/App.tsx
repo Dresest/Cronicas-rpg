@@ -8,10 +8,10 @@ import {
 } from 'lucide-react'
 import {FantasyIcon} from './lib/fantasyIcon'
 import { configured, supabase } from './lib/supabase'
-import { PlayView } from './PlayView'
-import {CharacterSheet} from './CharacterSheet'
-import { MoreView } from './MoreView'
-import { DMBulkRewards } from './DMBulkRewards'
+const PlayView = lazy(() => import('./PlayView').then(m => ({default:m.PlayView})))
+const CharacterSheet = lazy(() => import('./CharacterSheet').then(m => ({default:m.CharacterSheet})))
+const MoreView = lazy(() => import('./MoreView').then(m => ({default:m.MoreView})))
+const DMBulkRewards = lazy(() => import('./DMBulkRewards').then(m => ({default:m.DMBulkRewards})))
 import {CompetenceView,campaignClasses} from './CompetenceView'
 const SkillsView = lazy(() => import('./SkillsView').then(m => ({default:m.SkillsView})))
 const MissionsView = lazy(() => import('./MissionsView').then(m => ({default:m.MissionsView})))

@@ -21,6 +21,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verificar TypeScript y compilar Vite
         run: npm run build
+      - name: Comprobar presupuesto del JavaScript inicial
+        run: node scripts/check-bundle-budget.mjs
       - name: Comprobar sintaxis de la función de servidor
         run: node --check api/database-health.js
       - name: Probar servicio y rutas sin conexiones externas
