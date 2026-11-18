@@ -28,11 +28,11 @@ export type InventoryProps={
  compactStaff?:boolean;
 }
 
-export function ItemEditor({existing,onClose,onSave,busy}: {existing:ItemDefinition|null;onClose:()=>void;onSave:InventoryProps['onSave'];busy:boolean}){
+export function ItemEditor({existing,onClose,onSave,busy,seed}: {existing:ItemDefinition|null;onClose:()=>void;onSave:InventoryProps['onSave'];busy:boolean;seed?:Partial<ItemDraft>}){
  const [draft,setDraft]=useState<ItemDraft>(existing?{
   name:existing.name,description:existing.description,category:existing.category,rarity:existing.rarity,bonuses:existing.bonuses||{},
   passive_text:existing.passive_text,use_resource:existing.use_resource,restore_amount:existing.restore_amount,damage_bonus:existing.damage_bonus||0,damage_dice_count:existing.damage_dice_count||0,damage_die_sides:existing.damage_die_sides||null,equip_slot:existing.equip_slot||null,is_public:existing.is_public,is_active:existing.is_active
- }:baseDraft)
+ }:{...baseDraft,...seed})
  async function save(e:FormEvent){e.preventDefault();if(await onSave({...draft,name:draft.name.trim()},existing?.id||null))onClose()}
  return <div className="modal-backdrop inventory-overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onClose()}}>
   <section className="card inventory-editor" role="dialog" aria-modal="true" aria-label="Editar objeto del inventario">

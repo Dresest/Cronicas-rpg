@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, BookOpen, Check, ChevronDown, Coins, Edit3, LockKeyhole, Plus, Search, Shield, Sparkles, UserRound, WandSparkles, X, Zap } from 'lucide-react'
 import {FantasyIcon} from './lib/fantasyIcon'
+import {AIGeneratorDialog} from './AIGeneratorDialog'
 import type { Character, CharacterSkill, CharacterSkillAppearance, DMSkillProgress, Profile, Resource, Skill, SkillDraft, SkillRequest, PersonalSkillProposal, Threshold } from './types'
 
 type Props = {
@@ -43,8 +44,8 @@ export type CharacterSkillConfig = {
 const format=(n:number)=>new Intl.NumberFormat('es-CL').format(n)
 const initialDraft:SkillDraft={name:'',description:'',kind:'activa',purchase_pc:0,upgrade_pc:10,max_rank:3,min_level:1,resource_name:null,resource_cost:0,is_active:true,is_visible:true,is_requestable:true,is_usable:true}
 
-function SkillEditor({skill,resources,busy,onClose,onSave,playerMode=false}:{
-  skill:Skill|null;resources:Resource[];busy:boolean;onClose:()=>void;playerMode?:boolean;
+function SkillEditor({skill,resources,busy,onClose,onSave,playerMode=false,seed}:{
+  skill:Skill|null;resources:Resource[];busy:boolean;onClose:()=>void;playerMode?:boolean;seed?:Partial<SkillDraft>;
   onSave:(data:SkillDraft,id:string|null)=>Promise<boolean>
 }) {
   const [draft,setDraft]=useState<SkillDraft>(skill?{
@@ -53,7 +54,7 @@ function SkillEditor({skill,resources,busy,onClose,onSave,playerMode=false}:{
     max_rank:skill.max_rank??3,min_level:skill.min_level,
     resource_name:skill.resource_name,resource_cost:skill.resource_cost,is_active:skill.is_active,
     is_visible:skill.is_visible,is_requestable:skill.is_requestable,is_usable:skill.is_usable
-  }:initialDraft)
+  }:{...initialDraft,...seed})
   const names=[...new Set(['Vida','Maná','NEM','Éter',...resources.map(r=>r.name)])]
   const valid=draft.name.trim().length>=2&&draft.name.length<=70&&draft.description.trim().length>=1&&draft.description.length<=1500&&
     Number.isInteger(draft.purchase_pc)&&draft.purchase_pc>=0&&draft.purchase_pc<=100000&&
@@ -105,6 +106,8 @@ export function SkillsView({character,characters,profiles,levels,resources,skill
   const [filter,setFilter]=useState<'mias'|'todas'>('mias')
   const [search,setSearch]=useState('')
   const [editing,setEditing]=useState<Skill|null|undefined>(undefined)
+  const [aiOpen,setAiOpen]=useState(false)
+  const [aiSkill,setAiSkill]=useState<Partial<SkillDraft>|null>(null)
   const [editingPersonal,setEditingPersonal]=useState<string|null>(null)
   const level=useMemo(()=>levels.reduce((result,x)=>character.xp>=x.min_xp?Math.max(result,x.level):result,1),[character.xp,levels])
   const owned=useMemo(()=>new Map(learned.map(x=>[x.skill_id,x])),[learned])
@@ -118,7 +121,7 @@ export function SkillsView({character,characters,profiles,levels,resources,skill
   const skillName=(id:string)=>skills.find(s=>s.id===id)?.name||'Habilidad'
   const characterLabel=(id:string)=>{const c=characters.find(x=>x.id===id);const p=profiles.find(x=>x.id===c?.owner_id);return c?`${c.name} · ${p?.display_name||'Jugador'}`:'Personaje'}
   return <div className="stack skill-page">
-    <div className="page-heading"><div><span className="overline">TÉCNICAS Y PODERES</span><h1>Habilidades</h1><p>{isStaff?'Crea, asigna y modifica las habilidades de cada personaje.':'Escribe habilidades improvisadas, pide aprobación al DM y utiliza las que recibas.'}</p></div><button type="button" className="skill-primary skill-create-btn" disabled={busy} onClick={()=>setEditing(null)}><Plus size={18}/> {isStaff?'Nueva plantilla':'Escribir habilidad'}</button></div>
+    <div className="page-heading"><div><span className="overline">TÉCNICAS Y PODERES</span><h1>Habilidades</h1><p>{isStaff?'Crea, asigna y modifica las habilidades de cada personaje.':'Escribe habilidades improvisadas, pide aprobación al DM y utiliza las que recibas.'}</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{isStaff&&<button type="button" className="skill-secondary" disabled={busy} onClick={()=>setAiOpen(true)}><WandSparkles size={17}/> Crear con IA</button>}<button type="button" className="skill-primary skill-create-btn" disabled={busy} onClick={()=>{setAiSkill(null);setEditing(null)}}><Plus size={18}/> {isStaff?'Nueva plantilla':'Escribir habilidad'}</button></div></div>
     {isStaff&&<section className="card skill-manage-card"><div className="skill-manage-header"><div><span className="overline">PANEL DE GESTIÓN DEL DM</span><h3>¿Qué jugador estás modificando?</h3><p>Cualquier cambio realizado abajo afectará únicamente al personaje seleccionado.</p></div><Shield size={24}/></div><label className="skill-select-character"><UserRound size={18}/><select value={character.id} onChange={e=>{setEditingPersonal(null);onSelectCharacter(e.target.value)}} aria-label="Seleccionar personaje para habilidades">{characters.map(c=><option key={c.id} value={c.id}>{characterLabel(c.id)}</option>)}</select></label><div className="skill-management-stats"><span><BookOpen size={15}/> {learned.length} asignadas</span><span><Coins size={15}/> {format(character.pc)} PC del personaje</span><span>{allPending.length} solicitud(es) pendientes</span></div></section>}
     <div className="skill-summary"><div><span><BookOpen size={18}/> {isStaff?'Asignadas':'Mis habilidades'}</span><strong>{learned.length}</strong></div><div><span><Coins size={18}/> PC disponibles</span><strong>{format(character.pc)}</strong></div><div><span><Shield size={18}/> Nivel</span><strong>{level}</strong></div></div>
     {!isStaff&&personalProposals.some(x=>x.character_id===character.id)&&<section className="card skill-personal-proposals">
@@ -135,7 +138,8 @@ export function SkillsView({character,characters,profiles,levels,resources,skill
         :<div className="skill-requests-list">{allPending.map(req=><div className="skill-request-row" key={req.id}><div><div className="request-title"><span className={`request-kind ${'request-learning'}`}>{'APRENDER'}</span><b>{skillName(req.skill_id)}</b></div><small>{characterLabel(req.character_id)}</small></div><div className="skill-request-actions">{req.character_id!==character.id&&<button className="skill-secondary" type="button" onClick={()=>onSelectCharacter(req.character_id)}>Ver personaje</button>}<button className="skill-secondary" type="button" disabled={busy} onClick={()=>void onResolve(req.id,false)}>Rechazar</button><button className="skill-primary" type="button" disabled={busy} onClick={()=>void onResolve(req.id,true)}><Check size={15}/> Asignar habilidad</button></div></div>)}</div>}
       </div>
     </details>}
-    {editing!==undefined&&<SkillEditor key={editing?.id||'create'} skill={editing} resources={resources} busy={busy} playerMode={!isStaff} onClose={()=>setEditing(undefined)} onSave={isStaff?onSave:async draft=>onProposePersonal(draft)}/>}
+    {isStaff&&aiOpen&&<AIGeneratorDialog kind="skill" onClose={()=>setAiOpen(false)} onGenerated={value=>{setAiSkill(value as Partial<SkillDraft>);setEditing(null);setAiOpen(false)}}/>}
+    {editing!==undefined&&<SkillEditor key={editing?.id||'create-'+(aiSkill?.name||'manual')} skill={editing} seed={aiSkill||undefined} resources={resources} busy={busy} playerMode={!isStaff} onClose={()=>{setEditing(undefined);setAiSkill(null)}} onSave={isStaff?onSave:async draft=>onProposePersonal(draft)}/>}
     {isStaff&&editingPersonal&&(()=>{const s=skills.find(x=>x.id===editingPersonal),cs=owned.get(editingPersonal);return s&&cs?<CharacterSkillEditor key={character.id+'-'+s.id} skill={s} rank={cs.rank} appearance={appearanceById.get(s.id)} progress={secretById.get(s.id)} busy={busy} onClose={()=>setEditingPersonal(null)} onSave={data=>onConfigure(s.id,data)} onRemove={async()=>{await onRemove(s.id);setEditingPersonal(null)}}/>:null})()}
     <div className="skills-toolbar"><div className="skill-tabs" role="group" aria-label="Vista de habilidades"><button className={filter==='mias'?'current':''} onClick={()=>setFilter('mias')} aria-pressed={filter==='mias'}>{isStaff?'Asignadas':'Mis habilidades'} <span>{learned.length}</span></button><button className={filter==='todas'?'current':''} onClick={()=>setFilter('todas')} aria-pressed={filter==='todas'}>Catálogo <span>{skills.length}</span></button></div><label className="skill-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} aria-label="Buscar habilidad" placeholder="Buscar habilidad…"/></label></div>
     {matching.length===0?<section className="card skill-empty"><BookOpen size={31}/><h3>{filter==='mias'?'Sin habilidades asignadas':'Sin resultados'}</h3><p>{filter==='mias'?(isStaff?'Abre el catálogo y asigna una habilidad a este personaje.':'El DM debe asignarte una habilidad. También puedes solicitarla en el catálogo.'):'Prueba con otro nombre o pide al DM crear una nueva.'}</p><button className="skill-primary" type="button" onClick={()=>{setFilter('todas');setSearch('')}}>Ver catálogo <ArrowRight size={16}/></button></section>:<div className="skills-grid">{matching.map(s=>{
