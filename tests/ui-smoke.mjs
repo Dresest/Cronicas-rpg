@@ -107,7 +107,7 @@ async function main(){
    await sleep(250);
   }
   assert.ok(ready,'No inició el servidor Vite de pruebas.');
-  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+  browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox']});
   for(const role of ['jugador','dungeonMaster','adminInformatico'])await runRole(browser,role);
  }finally{
   if(browser)await browser.close();
