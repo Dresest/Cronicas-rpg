@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ButtonHTMLAttributes, type FormEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type FormEvent, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import {
   Activity, ArrowLeft, ArrowRight, Award, BookOpen, Check, ChevronDown, CircleAlert,
@@ -457,6 +457,10 @@ export default function App() {
   const goBack=useCallback(()=>{setTab(navStack.at(-1)||(profile?.role==='jugador'?'inicio':'admin'));setNavStack(stack=>stack.slice(0,-1));setMenuOpen(false);window.scrollTo({top:0,behavior:'instant'})},[navStack,profile?.role])
   const goHome=useCallback(()=>{setTab(profile?.role==='jugador'?'inicio':'admin');setNavStack([]);setMenuOpen(false);window.scrollTo({top:0,behavior:'instant'})},[profile?.role])
   const [busy,setBusy]=useState(false)
+  // El bloqueo por referencia es inmediato, incluso antes del siguiente render de React.
+  // Evita que dobles pulsaciones ejecuten dos veces un gasto o una recompensa.
+  const actionInProgress=useRef(false)
+  const characterRequestId=useRef(0)
   const [loading,setLoading]=useState(false)
   const [notice,setNotice]=useState('')
   useEffect(() => {
@@ -538,6 +542,7 @@ export default function App() {
   },[user,showError])
 
   const loadCharacter=useCallback(async()=>{
+    const requestId=++characterRequestId.current
     if(!selectedId)return
     try {
       const [r,a,h,sk,appears,secret,inventoryData,walletData,effectiveData,characterAchievementsQuery,proficiencyQuery,diceReadyQuery]=await Promise.all([
@@ -555,6 +560,8 @@ export default function App() {
         supabase.from('character_proficiencies').select('*').eq('character_id',selectedId).maybeSingle(),
         supabase.from('activity_logs').select('id').eq('character_id',selectedId).eq('action','character_dice_stats_set').limit(1),
       ])
+      // Si el usuario cambió de personaje, se ignoran los resultados atrasados.
+      if(requestId!==characterRequestId.current)return
       for(const item of [r,a,h,sk,appears,secret,inventoryData,walletData,effectiveData,characterAchievementsQuery,proficiencyQuery,diceReadyQuery])if(item.error)throw item.error
       setResources((r.data||[]) as Resource[]);setAttributes((a.data||[]) as Attribute[])
       setActivity((h.data||[]) as ActivityEvent[]);setLearnedSkills((sk.data||[]) as CharacterSkill[]);setSkillAppearances((appears.data||[]) as CharacterSkillAppearance[]);setDmSkillProgress((secret.data||[]) as DMSkillProgress[])
@@ -564,7 +571,7 @@ export default function App() {
       setCharacterAchievements((characterAchievementsQuery.data||[]) as CharacterAchievement[])
       setProficiency((proficiencyQuery.data||null) as CharacterProficiency|null)
       setStatsReady((diceReadyQuery.data||[]).length>0)
-    }catch(err){showError('No se pudo cargar la ficha: '+errText(err))}
+    }catch(err){if(requestId===characterRequestId.current)showError('No se pudo cargar la ficha: '+errText(err))}
   },[selectedId,profile?.role,showError])
 
   const loadAudit=useCallback(async()=>{
@@ -579,9 +586,12 @@ export default function App() {
   useEffect(()=>{void loadAudit()},[loadAudit])
 
   async function doAction(fn:()=>Promise<void>,success='Cambios guardados correctamente.',refresh:'all'|'character'|'none'='all'){
+    if(actionInProgress.current)return false
+    actionInProgress.current=true
     setBusy(true);setNotice('')
     try {await fn();setNotice(success);if(refresh==='all'){await loadMain();await loadCharacter();if(profile?.role==='adminInformatico')await loadAudit()}else if(refresh==='character'){await loadCharacter()}return true}
-    catch(err){showError(errText(err));return false}finally{setBusy(false)}
+    catch(err){showError(errText(err));return false}
+    finally{actionInProgress.current=false;setBusy(false)}
   }
   async function createCharacter(draft:CharacterDraft){return await doAction(async()=>{
     if(!user)throw new Error('Sesión no disponible')
@@ -824,7 +834,7 @@ export default function App() {
         {id:'partida' as Tab,title:'Partida',Icon:Dices},
         {id:'misiones' as Tab,title:'Misiones',Icon:ScrollText},
         {id:'mas' as Tab,title:'Más',Icon:Menu},
-      ]).map(({id,title,Icon})=><button key={id} type="button" aria-current={tab===id?'page':undefined} className={tab===id||(id==='mas'&&['atributos','habilidades','inventario','titulos','conocimientos','admin','bandeja'].includes(tab))?'active':''} onClick={()=>navigate(id)}><Icon size={22}/><span>{title}</span>{id==='bandeja'&&isStaff&&dmPendingCount>0&&<i className="mobile-nav-badge" aria-label={`${dmPendingCount} solicitudes pendientes`}>{dmPendingCount}</i>}</button>)}</nav>
+      ]).map(({id,title,Icon})=><button key={id} type="button" aria-current={tab===id?'page':undefined} className={tab===id||(id==='mas'&&(isStaff?['habilidades','titulos','conocimientos']:['atributos','habilidades','inventario','titulos','conocimientos']).includes(tab))?'active':''} onClick={()=>navigate(id)}><Icon size={22}/><span>{title}</span>{id==='bandeja'&&isStaff&&dmPendingCount>0&&<i className="mobile-nav-badge" aria-label={`${dmPendingCount} solicitudes pendientes`}>{dmPendingCount}</i>}</button>)}</nav>
     </div>
     {creatorOpen&&<div className="modal-backdrop" role="presentation"><div className="modal-panel" role="dialog" aria-modal="true" aria-label="Crear personaje"><CharacterCreate onCreate={createCharacter} busy={busy} first={false} onClose={()=>setCreatorOpen(false)}/></div></div>}
     {notice&&<div className="toast" role="status"><CircleAlert size={18}/><span>{notice}</span><button onClick={()=>setNotice('')} aria-label="Cerrar aviso"><X size={16}/></button></div>}
