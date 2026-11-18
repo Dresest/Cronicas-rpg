@@ -31,7 +31,7 @@ jobs:
 
   ui-smoke:
     name: Navegación de los tres roles con datos ficticios
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       VITE_SUPABASE_URL: https://rpg-e2e.supabase.co
       VITE_SUPABASE_ANON_KEY: dummy-public-key
