@@ -1,0 +1,80 @@
+name: Verificar frontend
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [mejoras-estabilidad-ui-v132]
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Verificar TypeScript y compilar Vite
+        run: npm run build
+      - name: Comprobar presupuesto del JavaScript inicial
+        run: node scripts/check-bundle-budget.mjs
+      - name: Comprobar sintaxis de la función de servidor
+        run: node --check api/database-health.js
+      - name: Probar servicio y rutas sin conexiones externas
+        run: npm run test:server
+
+
+  ui-smoke:
+    name: Navegación de los tres roles con datos ficticios
+    runs-on: ubuntu-24.04
+    env:
+      VITE_SUPABASE_URL: https://rpg-e2e.supabase.co
+      VITE_SUPABASE_ANON_KEY: dummy-public-key
+      VITE_AI_GENERATION_ENABLED: "true"
+      AI_GENERATION_ENABLED: "false"
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependencias de aplicación y Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          command -v google-chrome || command -v chromium
+      - name: Compilar sin claves reales
+        run: npm run build
+      - name: Comprobar vista móvil de jugador, DM y administrador
+        run: node tests/ui-smoke.mjs
+
+  quota-sql:
+    name: Validar cuotas IA en PostgreSQL temporal
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_only_password
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d testdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: test_only_password
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Comprobar migración de créditos en base aislada
+        run: psql -h localhost -U postgres -d testdb -v ON_ERROR_STOP=1 -f sql/test_ai_generation_quota.sql

@@ -14,6 +14,8 @@ export interface Character {
   species: string
   backstory: string
   portrait_key: string
+  portrait_path: string|null
+  base_damage_die: number
   xp: number
   pc: number
   created_at: string
@@ -154,9 +156,10 @@ export type ItemBonuses = Partial<Record<'Sabiduría'|'Carisma'|'Constitución'|
 export interface ItemDefinition {
   id:string;name:string;description:string;category:ItemCategory;rarity:ItemRarity
   bonuses:ItemBonuses;passive_text:string;use_resource:string|null;restore_amount:number
+  damage_bonus:number;damage_dice_count:number;damage_die_sides:number|null;equip_slot:string|null
   is_public:boolean;is_active:boolean;created_at:string;updated_at:string
 }
-export type ItemDraft=Pick<ItemDefinition,'name'|'description'|'category'|'rarity'|'bonuses'|'passive_text'|'use_resource'|'restore_amount'|'is_public'|'is_active'>
+export type ItemDraft=Pick<ItemDefinition,'name'|'description'|'category'|'rarity'|'bonuses'|'passive_text'|'use_resource'|'restore_amount'|'damage_bonus'|'damage_dice_count'|'damage_die_sides'|'equip_slot'|'is_public'|'is_active'>
 export interface CharacterItem { character_id:string;item_id:string;quantity:number;equipped:boolean;acquired_at:string }
 export interface CharacterWallet { character_id:string;copper:number;updated_at:string }
 export interface EffectiveAttribute {attribute_key:string;base_score:number;equipment_bonus:number;total_score:number;achievement_bonus:number}

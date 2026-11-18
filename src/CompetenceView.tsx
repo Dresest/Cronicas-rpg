@@ -42,11 +42,10 @@ function SkillPicker({selected,locked,onChange,disabled}: {
   </div>
 }
 
-export function ChosenCompetences({proficiency,attributes,effective}: {proficiency:CharacterProficiency|null;attributes:Attribute[];effective:EffectiveAttribute[]}) {
+export function ChosenCompetences({proficiency,attributes,effective,compact=false,hideHint=false}: {proficiency:CharacterProficiency|null;attributes:Attribute[];effective:EffectiveAttribute[];compact?:boolean;hideHint?:boolean}) {
   if (!proficiency?.primary_attribute) return <p className="muted">Aún no has elegido tu atributo principal.</p>
-  return <div className="campaign-competence-results">
-    <div className="campaign-competence-line"><span>Atributo principal</span><strong>{proficiency.primary_attribute}</strong></div>
-    <div className="campaign-competence-line"><span>Competencia del personaje</span><strong>{signed(proficiency.proficiency_bonus)}</strong></div>
+  return <div className={`campaign-competence-results${compact?' campaign-competence-results-compact':''}`}>
+    {!compact&&<div className="campaign-competence-line"><span>Competencia del personaje</span><strong>{signed(proficiency.proficiency_bonus)}</strong></div>}
     {proficiency.selected_skills.length===0?<p className="hint">Todavía no tienes habilidades seleccionadas. Puedes elegir dos de cualquier atributo.</p>:<div className="campaign-trained-list">
       {proficiency.selected_skills.map(skill=>{
         const attribute=skillAttribute(skill)
@@ -57,7 +56,7 @@ export function ChosenCompetences({proficiency,attributes,effective}: {proficien
         </div>
       })}
     </div>}
-    <p className="hint">Cada habilidad usa su propio atributo más la bonificación de competencia. Solo aparecen las habilidades elegidas y su selección es permanente.</p>
+    {!compact&&!hideHint&&<p className="hint">Cada habilidad usa su propio atributo más la bonificación de competencia. Solo aparecen las habilidades elegidas y su selección es permanente.</p>}
   </div>
 }
 

@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { ArrowRight, Archive, Check, CheckCheck, ChevronDown, Edit3, Package, Plus, Search, ShieldCheck, Users, X } from 'lucide-react'
+import { ArrowRight, Archive, Check, CheckCheck, ChevronDown, Edit3, Package, Plus, Search, ShieldCheck, Users, WandSparkles, X } from 'lucide-react'
 import { FantasyIcon } from './lib/fantasyIcon'
 import { ItemEditor, InventoryView } from './InventoryView'
+import {AIGeneratorDialog} from './AIGeneratorDialog'
 import type { Character, CharacterItem, CharacterWallet, ItemDefinition, ItemDraft, Profile } from './types'
 
 const categories = [
@@ -16,6 +17,7 @@ const categories = [
  {id:'otros',label:'Otros objetos',matches:(i:ItemDefinition)=>i.category==='objeto'&&i.restore_amount<=0&&!/\bcuerda\b/i.test(i.name)},
  {id:'clave',label:'Objetos clave',matches:(i:ItemDefinition)=>i.category==='clave'},
 ] as const
+const aiUiEnabled=import.meta.env.VITE_AI_GENERATION_ENABLED==='true'
 const rarityLabels:Record<ItemDefinition['rarity'],string>={comun:'Común',poco_comun:'Poco común',raro:'Raro',epico:'Épico',legendario:'Legendario'}
 
 type Props={
@@ -34,6 +36,8 @@ export function DMInventoryView({characters,profiles,selectedCharacter,items,own
  const [search,setSearch]=useState('')
  const [category,setCategory]=useState('vida')
  const [editor,setEditor]=useState<ItemDefinition|null|undefined>(undefined)
+ const [aiOpen,setAiOpen]=useState(false)
+ const [aiItem,setAiItem]=useState<Partial<ItemDraft>|null>(null)
  const [toGive,setToGive]=useState<ItemDefinition|null>(null)
  const [recipients,setRecipients]=useState<string[]>([])
  const [quantity,setQuantity]=useState('1')
@@ -55,7 +59,7 @@ export function DMInventoryView({characters,profiles,selectedCharacter,items,own
   if(await onBulkGrant(toGive.id,selectedRecipients.map(x=>x.id),amount))closeGive()
  }
  return <div className="stack dm-inventory-page">
-  <div className="page-heading dm-inventory-heading"><div><span className="overline">DUNGEON MASTER · GESTIÓN</span><h1>Catálogo de objetos</h1><p>Busca un objeto, elige los personajes y entrégalo en segundos.</p></div><button className="inv-button primary" onClick={()=>setEditor(null)} type="button"><Plus size={18}/> Crear objeto</button></div>
+  <div className="page-heading dm-inventory-heading"><div><span className="overline">DUNGEON MASTER · GESTIÓN</span><h1>Catálogo de objetos</h1><p>Busca un objeto, elige los personajes y entrégalo en segundos.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{aiUiEnabled&&<button className="inv-button subtle" onClick={()=>setAiOpen(true)} type="button"><WandSparkles size={18}/> Crear con IA</button>}<button className="inv-button primary" onClick={()=>{setAiItem(null);setEditor(null)}} type="button"><Plus size={18}/> Crear objeto</button></div></div>
   <div className="dm-quick-guide"><ShieldCheck size={19}/><span><strong>Entrega rápida:</strong> escoge una categoría → pulsa <b>Dar</b> → selecciona jugadores → confirma.</span><span className="dm-count">{items.length} objetos</span></div>
   <label className="inv-search dm-search"><Search size={19}/><input value={search} onChange={e=>{setSearch(e.target.value);if(e.target.value.trim())setCategory('all')}} placeholder="Buscar por nombre, efecto o rareza…" aria-label="Buscar objetos del catálogo"/>{search&&<button type="button" onClick={()=>setSearch('')} title="Limpiar búsqueda" aria-label="Limpiar búsqueda"><X size={17}/></button>}</label>
   <div className="dm-category-tabs" role="group" aria-label="Filtrar objetos por tipo">
@@ -87,7 +91,8 @@ export function DMInventoryView({characters,profiles,selectedCharacter,items,own
     {selectedCharacter&&players.some(c=>c.id===selectedCharacter.id)?<InventoryView character={selectedCharacter} characters={players} isStaff busy={busy} items={items} owned={owned} wallet={wallet} onSelectCharacter={onSelectCharacter} onSave={onSave} onGrant={onGrant} onAdjustMoney={onAdjustMoney} onEquip={onEquip} onUse={onUse} compactStaff/>:<p className="hint">Selecciona un jugador para retirar objetos o modificar sus monedas.</p>}
    </>}</div>
   </details>
-  {editor!==undefined&&<ItemEditor key={editor?.id||'new'} existing={editor} busy={busy} onSave={onSave} onClose={()=>setEditor(undefined)}/>}
+  {aiOpen&&<AIGeneratorDialog kind="item" onClose={()=>setAiOpen(false)} onGenerated={value=>{setAiItem(value as Partial<ItemDraft>);setEditor(null);setAiOpen(false)}}/>}
+  {editor!==undefined&&<ItemEditor key={editor?.id||'new-'+(aiItem?.name||'manual')} existing={editor} seed={aiItem||undefined} busy={busy} onSave={onSave} onClose={()=>{setEditor(undefined);setAiItem(null)}}/>}
   {toGive&&<div className="modal-backdrop inventory-overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)closeGive()}}>
    <section className="card dm-give-modal" role="dialog" aria-modal="true" aria-labelledby="dm-give-heading">
     <header className="dm-give-heading"><div><span className="overline">ENTREGAR OBJETO</span><h2 id="dm-give-heading">¿A quién se lo entregamos?</h2><p>{toGive.name} · {groupFor(toGive)}</p></div><button className="inv-icon" type="button" onClick={closeGive} disabled={busy} aria-label="Cerrar"><X size={20}/></button></header>

@@ -4,6 +4,7 @@ import {
   History, Layers3, MapPinned, Plus, Search, ShieldCheck, Sparkles, Swords, Users, X,
 } from 'lucide-react'
 import type { Character, KnowledgeCategory, KnowledgeEntry, Profile } from './types'
+import {AdventureJournal} from './AdventureJournal'
 
 const categories: {id:KnowledgeCategory;label:string;description:string;Icon:typeof BookOpen}[] = [
   {id:'mundo', label:'Mundo',description:'Culturas, costumbres, regiones y rumores',Icon:Globe2},
@@ -32,6 +33,7 @@ interface Props {
   onIncrease:(id:string)=>Promise<boolean>
 }
 export function KnowledgeView({character,characters,profiles,knowledge,isStaff,canCreate,busy,onSelectCharacter,onPropose,onReview,onIncrease}:Props){
+  const [section,setSection]=useState<'bitacora'|'conocimientos'>('bitacora')
   const [createOpen,setCreateOpen]=useState(false)
   const createDialogRef=useRef<HTMLDivElement|null>(null)
   const busyRef=useRef(busy)
@@ -90,6 +92,8 @@ export function KnowledgeView({character,characters,profiles,knowledge,isStaff,c
   }
   async function handleIncrease(id:string){setActiveId(id);try{await onIncrease(id)}finally{setActiveId(null)}}
   return <div className="stack knowledge-module">
+   <div className="journal-module-tabs" role="group" aria-label="Secciones de Conocimientos"><button type="button" className={section==='bitacora'?'active':''} onClick={()=>setSection('bitacora')}>Bitácora de aventura</button><button type="button" className={section==='conocimientos'?'active':''} onClick={()=>setSection('conocimientos')}>Conocimientos</button></div>
+   {section==='bitacora'?<AdventureJournal character={character} profiles={profiles} characters={characters}/>:<div className="knowledge-original-content">
     <div className="page-heading knowledge-heading"><div><span className="overline">BITÁCORA PERSONAL</span><h1>Conocimientos</h1><p>Lo que tu personaje aprende sobre el mundo. Cada conocimiento tiene su propia experiencia.</p></div>
       {canCreate&&<button className="button button-primary" type="button" onClick={()=>setCreateOpen(true)}><Plus size={17}/> Nuevo conocimiento</button>}
     </div>
@@ -164,5 +168,6 @@ export function KnowledgeView({character,characters,profiles,knowledge,isStaff,c
         </form>
       </div>
     </div>}
+  </div>}
   </div>
 }

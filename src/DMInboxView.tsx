@@ -12,22 +12,7 @@ export function DMInboxView({characters,profiles,skills,skillRequests,personalPr
  const [search,setSearch]=useState('')
  const [category,setCategory]=useState<'todas'|'habilidades'|'misiones'|'conocimientos'>('todas')
  const [notes,setNotes]=useState<Record<string,string>>({})
- const [personalConfig,setPersonalConfig]=useState<Record<string,{upgrade_pc:string;max_rank:string;min_level:string}>>({})
- const getPersonalConfig=(p:PersonalSkillProposal)=>personalConfig[p.id]||{upgrade_pc:String(p.upgrade_pc??10),max_rank:String(p.max_rank??3),min_level:String(p.min_level??1)}
- const updatePersonalConfig=(id:string,key:'upgrade_pc'|'max_rank'|'min_level',value:string,p:PersonalSkillProposal)=>{
-  setPersonalConfig(old=>({...old,[id]:{...(old[id]||getPersonalConfig(p)),[key]:value}}))
- }
- const validPersonalConfig=(p:PersonalSkillProposal)=>{
-   const c=getPersonalConfig(p)
-   const values=[Number(c.upgrade_pc),Number(c.max_rank),Number(c.min_level)]
-   return values.every(Number.isInteger)&&values[0]>=1&&values[0]<=100000&&values[1]>=1&&values[1]<=20&&values[2]>=1&&values[2]<=10000
- }
- const approvePersonal=async(p:PersonalSkillProposal)=>{
-   if(!validPersonalConfig(p))return
-   const c=getPersonalConfig(p)
-   await onReviewPersonal(p.id,true,{upgrade_pc:Number(c.upgrade_pc),max_rank:Number(c.max_rank),min_level:Number(c.min_level)})
- }
- const skillPending=skillRequests.filter(x=>x.status==='pendiente')
+ const skillPending=skillRequests.filter(x=>x.status==='pendiente'&&x.request_type==='aprender')
  const personalPending=personalProposals.filter(x=>x.status==='pendiente')
  const proposedMissions=missions.filter(x=>x.status==='propuesta')
  const objectivesPending=objectives.filter(x=>x.claimed_at&&!x.completed)
@@ -45,23 +30,16 @@ export function DMInboxView({characters,profiles,skills,skillRequests,personalPr
   <div className="inbox-summary"><div><Swords size={18}/><b>{current.skills}</b><small>Habilidades</small></div><div><ScrollText size={18}/><b>{current.missions}</b><small>Misiones</small></div><div><BookOpen size={18}/><b>{current.knowledge}</b><small>Conocimientos</small></div></div>
   <div className="inbox-toolbar"><div className="inbox-filter" role="group" aria-label="Filtrar solicitudes">{options.map(([value,title,count])=><button type="button" key={value} className={category===value?'active':''} onClick={()=>setCategory(value)} aria-pressed={category===value}>{title} <b>{count}</b></button>)}</div><label className="inbox-search"><Search size={17}/><input type="search" aria-label="Buscar solicitud" placeholder="Buscar por nombre o personaje…" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>
   {!hasVisible&&<div className="card inbox-empty"><ShieldCheck size={31}/><h3>{total===0?'Todo al día':'No hay coincidencias'}</h3><p>{total===0?'Tus jugadores todavía no tienen solicitudes pendientes.':'Prueba a cambiar el filtro o el término de búsqueda.'}</p></div>}
-  {(category==='todas'||category==='habilidades')&&skillPending.filter(r=>canShow(skills.find(s=>s.id===r.skill_id)?.name||'',person(r.character_id),'habilidades')).length>0&&<details className="card admin-fold inbox-group" open><summary className="admin-fold-title"><div><span className="overline">APRENDIZAJES Y ENTRENAMIENTO</span><h3>Habilidades <span className="knowledge-count">{current.skills}</span></h3></div><ChevronDown size={20}/></summary><div className="admin-fold-body inbox-cards">{skillPending.filter(r=>canShow(skills.find(s=>s.id===r.skill_id)?.name||'',person(r.character_id),'habilidades')).map(r=><article key={r.id} className="inbox-card"><div className="inbox-card-top"><span className="inbox-type">{r.request_type==='mejorar'?'MEJORAR':'APRENDER'}</span><small><Clock3 size={13}/> {new Date(r.requested_at).toLocaleDateString('es-CL')}</small></div><strong>{skills.find(s=>s.id===r.skill_id)?.name||'Habilidad'}</strong><p><UserRound size={14}/>{person(r.character_id)}</p><div className="inbox-actions"><button className="button button-outline" onClick={()=>onOpen('habilidades',r.character_id)}>Ver ficha <ArrowRight size={15}/></button><button disabled={busy} className="button button-outline" onClick={()=>void onResolveSkill(r.id,false)}><X size={15}/> Rechazar</button><button disabled={busy} className="button button-primary" onClick={()=>void onResolveSkill(r.id,true)}><Check size={15}/> {r.request_type==='mejorar'?'Aprobar mejora':'Asignar'}</button></div>{r.request_type==='mejorar'&&<small className="inbox-hint">Si alcanzó el rango máximo o necesitas cambiar sus efectos, entra a Ver ficha para configurar la transformación.</small>}</article>)}</div></details>}
+  {(category==='todas'||category==='habilidades')&&skillPending.filter(r=>canShow(skills.find(s=>s.id===r.skill_id)?.name||'',person(r.character_id),'habilidades')).length>0&&<details className="card admin-fold inbox-group" open><summary className="admin-fold-title"><div><span className="overline">SOLICITUDES DE APRENDIZAJE</span><h3>Habilidades <span className="knowledge-count">{current.skills}</span></h3></div><ChevronDown size={20}/></summary><div className="admin-fold-body inbox-cards">{skillPending.filter(r=>canShow(skills.find(s=>s.id===r.skill_id)?.name||'',person(r.character_id),'habilidades')).map(r=><article key={r.id} className="inbox-card"><div className="inbox-card-top"><span className="inbox-type">APRENDER</span><small><Clock3 size={13}/> {new Date(r.requested_at).toLocaleDateString('es-CL')}</small></div><strong>{skills.find(s=>s.id===r.skill_id)?.name||'Habilidad'}</strong><p><UserRound size={14}/>{person(r.character_id)}</p><div className="inbox-actions"><button className="button button-outline" onClick={()=>onOpen('habilidades',r.character_id)}>Ver ficha <ArrowRight size={15}/></button><button disabled={busy} className="button button-outline" onClick={()=>void onResolveSkill(r.id,false)}><X size={15}/> Rechazar</button><button disabled={busy} className="button button-primary" onClick={()=>void onResolveSkill(r.id,true)}><Check size={15}/> Asignar</button></div></article>)}</div></details>}
   {(category==='todas'||category==='habilidades')&&personalPending.some(p=>canShow(p.name,person(p.character_id),'habilidades'))&&
     <details className="card admin-fold inbox-group" open><summary className="admin-fold-title"><div><span className="overline">TÉCNICAS CREADAS POR JUGADORES</span><h3>Nuevas habilidades por aprobar <span className="knowledge-count">{personalPending.length}</span></h3></div><ChevronDown size={20}/></summary>
       <div className="admin-fold-body inbox-cards">{personalPending.filter(p=>canShow(p.name,person(p.character_id),'habilidades')).map(p=><article className="inbox-card" key={p.id}>
         <div className="inbox-card-top"><span className="inbox-type">HABILIDAD PERSONAL</span><small><Clock3 size={13}/>{new Date(p.created_at).toLocaleDateString('es-CL')}</small></div>
         <strong>{p.name}</strong><p><UserRound size={14}/>{person(p.character_id)}</p><p>{p.description}</p>
         <div className="skill-facts"><span><BookOpen size={15}/>{p.kind==='activa'?'Activa':'Pasiva'}</span><span>{p.kind==='activa'?(p.resource_cost>0?`${p.resource_cost} ${p.resource_name} por uso`:'Sin consumo'):'No consume recursos'}</span></div>
-        <div className="personal-skill-dm-settings"><strong><ShieldCheck size={17}/> Configuración exclusiva del DM</strong>
-          <div className="personal-skill-dm-fields">
-            <label>PC para subir de rango<input type="number" inputMode="numeric" min={1} max={100000} step={1} value={getPersonalConfig(p).upgrade_pc} onChange={e=>updatePersonalConfig(p.id,'upgrade_pc',e.target.value,p)}/></label>
-            <label>Rango máximo<input type="number" inputMode="numeric" min={1} max={20} step={1} value={getPersonalConfig(p).max_rank} onChange={e=>updatePersonalConfig(p.id,'max_rank',e.target.value,p)}/></label>
-            <label>Nivel mínimo<input type="number" inputMode="numeric" min={1} max={10000} step={1} value={getPersonalConfig(p).min_level} onChange={e=>updatePersonalConfig(p.id,'min_level',e.target.value,p)}/></label>
-          </div>
-        </div>
-        <small className="inbox-hint">Al aprobar, estos valores quedan definidos por el DM y la habilidad se asigna solo a {person(p.character_id)}.</small>
+        <small className="inbox-hint">Al aprobar se entrega exclusivamente a {person(p.character_id)}, sin niveles ni rangos de habilidad.</small>
         <div className="inbox-actions"><button type="button" disabled={busy} className="button button-outline" onClick={()=>void onReviewPersonal(p.id,false)}><X size={15}/> Rechazar</button>
-          <button type="button" disabled={busy||!validPersonalConfig(p)} className="button button-primary" onClick={()=>void approvePersonal(p)}><Check size={15}/> Aprobar y asignar</button></div>
+          <button type="button" disabled={busy} className="button button-primary" onClick={()=>void onReviewPersonal(p.id,true)}><Check size={15}/> Aprobar y asignar</button></div>
       </article>)}</div>
     </details>}
   {(category==='todas'||category==='misiones')&&(proposedMissions.some(x=>canShow(x.title,'','misiones'))||objectivesPending.some(x=>canShow(mission(x.mission_id),person(x.claimed_by_character_id||''),'misiones'))||completionsPending.some(x=>canShow(mission(x.mission_id),person(x.character_id),'misiones')))&&<details className="card admin-fold inbox-group" open><summary className="admin-fold-title"><div><span className="overline">AVENTURAS EN CURSO</span><h3>Misiones <span className="knowledge-count">{current.missions}</span></h3></div><ChevronDown size={20}/></summary><div className="admin-fold-body inbox-cards">
