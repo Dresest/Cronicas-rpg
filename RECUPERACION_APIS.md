@@ -30,3 +30,9 @@ La configuración `vercel.json` ejecuta `npm run build:production`, que exige `R
 ## Visibilidad de IA por entorno
 
 Los botones «Crear con IA» solo aparecen al activar **`VITE_AI_GENERATION_ENABLED=true`**. El endpoint requiere también **`AI_GENERATION_ENABLED=true`**. Ambas variables están desactivadas por defecto para que las vistas previas no muestren botones inoperativos. La guardia de publicación exige ambas habilitadas cuando `RPG_RELEASE_APPROVED=true`, evitando perder las funciones de IA al sustituir producción.
+
+## Reglas de compatibilidad del catálogo
+
+La normalización del generador se contrastó con las restricciones de las tablas reales de Supabase: las armas no combinan bonificaciones de atributo y daño fijo; solo los objetos consumibles restauran recursos; una habilidad pasiva no requiere recursos. Las pruebas simulan respuestas incompatibles de IA y verifican su transformación a borradores válidos. Se agregó además una prueba SQL del rol `adminInformatico` en PostgreSQL temporal.
+
+**Limitación pendiente:** la cuota actual cuenta *intentos autorizados*, porque se reserva antes de llamar al proveedor. Si el proveedor falla, el intento también queda contado. La publicación seguirá bloqueada hasta decidir explícitamente la política de reembolso de créditos o implementar una conciliación segura del servidor.

@@ -38,10 +38,13 @@ function normalizeItem(o){
   const attribute=choose(o.attribute_key,ATTRIBUTES,null);
   const attributeBonus=clamp(o.attribute_bonus,-10,10);
   const bonuses=attribute&&attributeBonus?{[attribute]:attributeBonus}:{};
-  const dmg=category==='arma'&&!attributeBonus?clamp(o.damage_bonus,0,10):0;
-  const useResource=choose(o.use_resource,RESOURCES,null);
+  const hasBonus=Object.keys(bonuses).length>0;
+  // El catálogo de Supabase prohíbe mezclar daño fijo y bonos en armas.
+  const dmg=category==='arma'&&!hasBonus?clamp(o.damage_bonus,0,10):0;
+  // Solo los consumibles de la categoría «objeto» pueden restaurar recursos.
+  const useResource=category==='objeto'?choose(o.use_resource,RESOURCES,null):null;
   return {
-    name:text(o.name,70)||'Objeto sin nombre',
+    name:text(o.name,70).length>=2?text(o.name,70):'Objeto sin nombre',
     description:text(o.description,800),
     category,
     rarity:choose(o.rarity,RARITIES,'comun'),
@@ -57,7 +60,7 @@ function normalizeSkill(o){
   const kind=choose(o.kind,['activa','pasiva'],'activa');
   const resource=kind==='activa'?choose(o.resource_name,RESOURCES,null):null;
   return {
-    name:text(o.name,70)||'Habilidad sin nombre',
+    name:text(o.name,70).length>=2?text(o.name,70):'Habilidad sin nombre',
     description:text(o.description,800),
     kind,resource_name:resource,
     resource_cost:resource?clamp(o.resource_cost,0,100):0,

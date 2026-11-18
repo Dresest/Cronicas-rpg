@@ -8,10 +8,12 @@ AS $$SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
 CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text NOT NULL);
 INSERT INTO auth.users(id) VALUES
 ('11111111-1111-1111-1111-111111111111'),
-('22222222-2222-2222-2222-222222222222');
+('22222222-2222-2222-2222-222222222222'),
+('33333333-3333-3333-3333-333333333333');
 INSERT INTO public.profiles(id,role) VALUES
 ('11111111-1111-1111-1111-111111111111','dungeonMaster'),
-('22222222-2222-2222-2222-222222222222','jugador');
+('22222222-2222-2222-2222-222222222222','jugador'),
+('33333333-3333-3333-3333-333333333333','adminInformatico');
 
 \i sql/ai_generation_quota.sql
 
@@ -67,13 +69,24 @@ BEGIN
 END
 $test$;
 
+SET request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+DO $admin_test$
+DECLARE result jsonb;
+BEGIN
+ SELECT public.reserve_ai_generation('skill') INTO result;
+ IF result->>'allowed' <> 'true' THEN
+   RAISE EXCEPTION 'Admin informático debería poder generar: %',result;
+ END IF;
+END
+$admin_test$;
+
 RESET ROLE;
 DO $test$
 DECLARE n integer;
 BEGIN
  SELECT count(*) INTO n FROM private.ai_generation_usage;
- IF n<>2 THEN
-   RAISE EXCEPTION 'Se esperaban 2 registros de uso y hay %',n;
+ IF n<>3 THEN
+   RAISE EXCEPTION 'Se esperaban 3 registros de uso y hay %',n;
  END IF;
 END
 $test$;

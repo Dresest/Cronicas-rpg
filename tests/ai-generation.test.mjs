@@ -94,3 +94,52 @@ test('créditos de Vercel agotados generan el código que espera el cliente',asy
   const res=response();await rpg(request(),res);
   assert.equal(res.statusCode,402);assert.equal(res.body.code,'CREDITS_EXHAUSTED');
 });
+
+// Reglas verificadas en las restricciones de public.item_definitions y public.skills.
+// No hacen conexiones reales con Supabase ni gastan créditos.
+test('un arma con daño, bono de atributo y restauración no infringe las reglas del catálogo',async()=>{
+  env();
+  const proposed={...itemBody,attribute_key:'Fuerza',attribute_bonus:3,damage_bonus:8,use_resource:'Vida',restore_amount:45};
+  globalThis.fetch=async url=>url.endsWith('/auth/v1/user')?ok({id:'staff'}):
+    url.endsWith('/reserve_ai_generation')?ok({allowed:true}):
+    ok({choices:[{message:{content:JSON.stringify(proposed)}}]});
+  const res=response();await rpg(request(),res);
+  assert.equal(res.statusCode,200);
+  assert.deepEqual(res.body.item.bonuses,{Fuerza:3});
+  assert.equal(res.body.item.damage_bonus,0);
+  assert.equal(res.body.item.use_resource,null);
+  assert.equal(res.body.item.restore_amount,0);
+});
+test('un objeto consumible puede restaurar recursos con límites coherentes',async()=>{
+  env();
+  const proposed={...itemBody,category:'objeto',damage_bonus:8,attribute_key:null,attribute_bonus:0,use_resource:'Maná',restore_amount:25};
+  globalThis.fetch=async url=>url.endsWith('/auth/v1/user')?ok({id:'staff'}):
+    url.endsWith('/reserve_ai_generation')?ok({allowed:true}):
+    ok({choices:[{message:{content:JSON.stringify(proposed)}}]});
+  const res=response();await rpg(request(),res);
+  assert.equal(res.statusCode,200);
+  assert.equal(res.body.item.damage_bonus,0);
+  assert.equal(res.body.item.use_resource,'Maná');
+  assert.equal(res.body.item.restore_amount,25);
+});
+test('una habilidad pasiva no requiere recurso ni consume puntos por uso',async()=>{
+  env();
+  const proposed={name:'Escudo de hielo',description:'Protección constante',kind:'pasiva',resource_name:'Vida',resource_cost:50,purchase_pc:2,min_level:1};
+  globalThis.fetch=async url=>url.endsWith('/auth/v1/user')?ok({id:'staff'}):
+    url.endsWith('/reserve_ai_generation')?ok({allowed:true}):
+    ok({choices:[{message:{content:JSON.stringify(proposed)}}]});
+  const res=response();await rpg(request({kind:'skill',prompt:'Una habilidad pasiva protectora'}),res);
+  assert.equal(res.statusCode,200);
+  assert.equal(res.body.skill.resource_name,null);
+  assert.equal(res.body.skill.resource_cost,0);
+});
+test('el nombre generado tiene un mínimo válido y no excede el máximo de base de datos',async()=>{
+  env();
+  const proposed={...itemBody,name:'X'};
+  globalThis.fetch=async url=>url.endsWith('/auth/v1/user')?ok({id:'staff'}):
+    url.endsWith('/reserve_ai_generation')?ok({allowed:true}):
+    ok({choices:[{message:{content:JSON.stringify(proposed)}}]});
+  const res=response();await rpg(request(),res);
+  assert.equal(res.statusCode,200);
+  assert.equal(res.body.item.name,'Objeto sin nombre');
+});
