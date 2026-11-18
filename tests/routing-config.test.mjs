@@ -6,7 +6,7 @@ const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url
 
 test("el cron conserva la frecuencia de producción", () => {
   assert.deepEqual(config.crons, [
-    { path: "/api/database-health", schedule: "0 9 * * 0" }
+    { path: "/api/database-health", schedule: "0 9 * * *" }
   ]);
 });
 
