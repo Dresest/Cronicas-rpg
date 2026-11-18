@@ -30,6 +30,19 @@ for(const path of assets){
       keys.push({term,fieldNames:[...new Set(fields)].filter(k=>/^[a-zA-Z][a-zA-Z0-9_]*$/.test(k)).slice(0,80)});
     }
     console.log(JSON.stringify({path,status:response.status,bytes:body.length,contentType:ct.split(';')[0],matches,keys}));
+    // Solo se imprime un fragmento de la llamada del navegador, nunca secretos o tokens.
+    if(path.includes('index-db-keepalive-20261030.js')){
+      const needle='/api/generate-rpg';
+      const p=body.indexOf(needle);
+      if(p>=0){
+        const excerpt=body.slice(Math.max(0,p-560),Math.min(body.length,p+240))
+          .replace(/eyJ[A-Za-z0-9_.-]{30,}/g,'[JWT REDACTADO]')
+          .replace(/sb_(?:publishable|secret)_[A-Za-z0-9_-]+/g,'[CLAVE REDACTADA]')
+          .replace(/https:\/\/[^ "'`]+?supabase\.co/g,'[URL SUPABASE REDACTADA]');
+        console.log(JSON.stringify({clientContractExcerpt:excerpt}));
+      }
+    }
+
     anyReadable=true;
   }catch(error){
     console.log(JSON.stringify({path,accessible:false,error:error instanceof Error?error.name:'unknown'}));
