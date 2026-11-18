@@ -16,7 +16,7 @@ INSERT INTO public.profiles(id,role) VALUES
 
 -- Simular una instalación previa para demostrar que se cierra su ruta insegura.
 CREATE FUNCTION public.reserve_ai_generation(p_kind text)
-RETURNS jsonb LANGUAGE sql AS $ SELECT '{}'::jsonb $;
+RETURNS jsonb LANGUAGE sql AS $legacy$ SELECT '{}'::jsonb $legacy$;
 GRANT EXECUTE ON FUNCTION public.reserve_ai_generation(text) TO authenticated;
 
 \i sql/ai_generation_quota.sql
