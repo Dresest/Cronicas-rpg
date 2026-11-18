@@ -32,6 +32,15 @@ for(const path of assets){
     console.log(JSON.stringify({path,status:response.status,bytes:body.length,contentType:ct.split(';')[0],matches,keys}));
     // Solo se imprime un fragmento de la llamada del navegador, nunca secretos o tokens.
     if(path.includes('index-db-keepalive-20261030.js')){
+      // Contrato público cliente-servidor: definición y llamadas sin valores de tokens.
+      const indexes=[...body.matchAll(/AiRpgRequest\(/g)].map(m=>m.index);
+      for(const [n,p] of indexes.slice(0,6).entries()){
+        const segment=body.slice(Math.max(0,p-(n===0?20:240)),Math.min(body.length,p+(n===0?1250:300)))
+          .replace(/eyJ[A-Za-z0-9_.-]{30,}/g,'[JWT REDACTADO]')
+          .replace(/sb_(?:publishable|secret)_[A-Za-z0-9_-]+/g,'[CLAVE REDACTADA]');
+        console.log(JSON.stringify({clientCallIndex:n,excerpt:segment}));
+      }
+
       const needle='/api/generate-rpg';
       const p=body.indexOf(needle);
       if(p>=0){
