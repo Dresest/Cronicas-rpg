@@ -1,22 +1,22 @@
-# Crónicas RPG — código fuente histórico (v1.3.2)
+# Crónicas RPG — versión de código recuperada 1.3.4
 
-Sitio web RPG responsivo desarrollado con **React, TypeScript, Vite y Supabase**.
+Aplicación web responsiva para partidas RPG construida con React, TypeScript, Vite y Supabase.
 
-> **Aviso importante:** este repositorio comienza con un respaldo recuperado de la versión **1.3.2 (25 de octubre de 2026)**. La página actualmente publicada en Vercel es posterior. **No conectar esta rama a producción ni desplegarla encima de la versión vigente** hasta reconciliar los cambios y probar la aplicación.
+**Estado:** esta rama recupera el código fuente histórico **v1.3.4 (26 de octubre de 2026)** y añade mejoras de estabilidad. El despliegue vigente de Vercel es posterior (octubre/noviembre), y su fuente React no está disponible en Vercel; todavía es necesario contrastar las diferencias que pudiera tener.
 
-## Uso local
-1. Instalar Node.js 22 o superior.
-2. Ejecutar `npm install`.
-3. Crear `.env` a partir de `.env.example` y configurar la URL y **clave publicable** de Supabase.
-4. Ejecutar `npm run dev`.
-5. Antes de publicar: `npm run typecheck` y `npm run build`.
+## Abrir en Visual Studio Code
+
+1. Instalar Node.js 22 y ejecutar `npm install`.
+2. Copiar `.env.example` a `.env` y completar la URL y la clave **publicable** de Supabase.
+3. Ejecutar `npm run dev` para desarrollo.
+4. Ejecutar `npm run build` antes de publicar.
 
 ## Seguridad
-El repositorio es público. Nunca agregar `.env`, claves `service_role`, tokens, secretos ni datos personales de jugadores.
-Git conserva **código fuente**, no constituye respaldo de la base de datos Supabase.
 
-## Próximos pasos
-- Comparar el frontend recuperado con la versión posterior publicada en Vercel.
-- Verificar las funciones existentes y los permisos de jugador, DM y administrador informático.
-- Optimizar navegación móvil, panel del DM y consultas.
-- Conectar despliegue automatizado **solo después** de recuperar y verificar el estado de producción.
+No subir `.env`, claves `service_role`, tokens, secretos ni datos personales. GitHub contiene únicamente código fuente, no un respaldo de la base de datos.
+
+## Despliegue
+
+**No conectar esta rama ni `main` al despliegue automático de producción** hasta conciliar el código histórico con la web actual y efectuar las pruebas de regresión de login, roles, recursos, habilidades, inventario, fichas de personajes, misiones, bitácora y DM.
+
+Las correcciones de seguridad y RLS de Supabase fueron aplicadas por separado y no requieren desplegar este frontend.

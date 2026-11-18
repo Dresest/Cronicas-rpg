@@ -1,24 +1,9 @@
-# Mejoras iniciales de estabilidad (rama de desarrollo)
+# Mejoras de estabilidad — rama de reconciliación v1.3.4
 
-**Base:** respaldo histórico v1.3.2. **No desplegar en producción** sin reconciliar los cambios posteriores de Vercel.
+1. Se reemplazó la base histórica v1.3.2 por el código fuente más completo **v1.3.4**.
+2. El bloqueo inmediato del manejador de acciones previene dobles pulsaciones antes del render. La idempotencia del servidor debe implementarse aparte en operaciones sensibles si se busca protección frente a reintentos de red.
+3. Las lecturas de ficha de personaje se invalidan por secuencia para evitar resultados obsoletos de Supabase.
+4. El botón móvil «Más» deja de aparecer activo a la vez que «Panel», «Objetos» y «Solicitudes» del DM.
+5. `.github/workflows/frontend.yml` ejecuta `npm run build` para verificar TypeScript y Vite.
 
-## Cambios
-1. Se añade un bloqueo inmediato de acciones RPC en la interfaz para evitar duplicación por doble clic. Complementa, pero no sustituye, protecciones de transacción y de idempotencia del servidor.
-2. Se descartan respuestas obsoletas de consultas de ficha cuando se cambia de personaje durante la carga.
-3. Se corrige el estado seleccionado de la navegación móvil del DM: el botón «Más» ya no aparece activo a la vez que «Panel», «Objetos» o «Solicitudes».
-4. Se añade verificación automatizada de TypeScript/Vite para esta rama y para propuestas contra `main`.
-
-## Comprobaciones
-- Transpilación de sintaxis TypeScript: realizada localmente.
-- Build completo: pendiente de ejecutar en GitHub Actions; el entorno local no consiguió descargar las dependencias.
-- Pruebas con cuentas autenticadas y regresión de funciones: pendientes.
-
-## Próximas pruebas antes de un despliegue
-- Repetir dos clics rápidos en gastar recurso y asignar recompensa: comprobar que se ejecuta una sola operación.
-- Cambiar rápidamente entre personajes de un DM: confirmar que no se mezclan datos.
-- Comprobar que la barra de navegación móvil solo resalta una opción.
-- Confirmar roles `jugador`, `dungeonMaster`, `adminInformatico`, misiones, inventario, habilidades, registros privados y recursos.
-- Recuperar cambios entre v1.3.2 y la implementación de producción posterior; la fuente publicada de Vercel solo incluye archivos compilados, no el proyecto React original.
-
-## Seguridad
-No subir archivos `.env` ni credenciales de servicio. Esta rama no modifica Supabase ni Vercel.
+**No fusionar ni desplegar a producción todavía.** Verificar cambios posteriores de Vercel y realizar pruebas funcionales con los tres roles.

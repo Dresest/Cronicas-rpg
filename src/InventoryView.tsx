@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Archive, ArrowRight, Check, ChevronDown, Coins, Crown, Edit3, FlaskConical, Gem, KeyRound, LockKeyhole, Package, Plus, Search, Shield, Sparkles, Sword, Wallet, X } from 'lucide-react'
 import {FantasyIcon} from './lib/fantasyIcon'
+import {equippedSlot} from './lib/damage'
 import type { Character, CharacterItem, CharacterWallet, ItemDefinition, ItemDraft, ItemCategory } from './types'
 
 const groups:{id:ItemCategory,title:string,description:string,Icon:typeof Package}[]=[
@@ -14,7 +15,7 @@ const rarities:{id:ItemDefinition['rarity'];label:string}[]=[{id:'comun',label:'
 const fmt=(n:number)=>new Intl.NumberFormat('es-CL').format(n)
 export const formatMoney=(copper:number)=>{const gold=Math.floor(copper/100),silver=Math.floor((copper%100)/10),rest=copper%10;return `${fmt(gold)} oro · ${fmt(silver)} plata · ${fmt(rest)} cobre`}
 export const splitMoney=(copper:number)=>({gold:Math.floor(copper/100),silver:Math.floor((copper%100)/10),copper:copper%10})
-const baseDraft:ItemDraft={name:'',description:'',category:'objeto',rarity:'comun',bonuses:{},passive_text:'',use_resource:null,restore_amount:0,is_public:true,is_active:true}
+const baseDraft:ItemDraft={name:'',description:'',category:'objeto',rarity:'comun',bonuses:{},passive_text:'',use_resource:null,restore_amount:0,damage_bonus:0,damage_dice_count:0,damage_die_sides:null,equip_slot:null,is_public:true,is_active:true}
 export type InventoryProps={
  character:Character;characters:Character[];isStaff:boolean;busy:boolean;
  items:ItemDefinition[];owned:CharacterItem[];wallet:CharacterWallet|null;
@@ -30,7 +31,7 @@ export type InventoryProps={
 export function ItemEditor({existing,onClose,onSave,busy}: {existing:ItemDefinition|null;onClose:()=>void;onSave:InventoryProps['onSave'];busy:boolean}){
  const [draft,setDraft]=useState<ItemDraft>(existing?{
   name:existing.name,description:existing.description,category:existing.category,rarity:existing.rarity,bonuses:existing.bonuses||{},
-  passive_text:existing.passive_text,use_resource:existing.use_resource,restore_amount:existing.restore_amount,is_public:existing.is_public,is_active:existing.is_active
+  passive_text:existing.passive_text,use_resource:existing.use_resource,restore_amount:existing.restore_amount,damage_bonus:existing.damage_bonus||0,damage_dice_count:existing.damage_dice_count||0,damage_die_sides:existing.damage_die_sides||null,equip_slot:existing.equip_slot||null,is_public:existing.is_public,is_active:existing.is_active
  }:baseDraft)
  async function save(e:FormEvent){e.preventDefault();if(await onSave({...draft,name:draft.name.trim()},existing?.id||null))onClose()}
  return <div className="modal-backdrop inventory-overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onClose()}}>
@@ -39,7 +40,13 @@ export function ItemEditor({existing,onClose,onSave,busy}: {existing:ItemDefinit
    <form onSubmit={e=>void save(e)} className="inventory-editor-form">
     <label>Nombre<input required minLength={2} maxLength={90} placeholder="Ej.: Armadura del viento" value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))}/></label>
     <label>Descripción<textarea rows={3} maxLength={2000} value={draft.description} onChange={e=>setDraft(d=>({...d,description:e.target.value}))} placeholder="Historia, función o condiciones del objeto…"/></label>
-    <div className="inv-fields-2"><label>Categoría<select value={draft.category} onChange={e=>setDraft(d=>({...d,category:e.target.value as ItemCategory,restore_amount:e.target.value==='objeto'?d.restore_amount:0}))}>{groups.map(g=><option key={g.id} value={g.id}>{g.title}</option>)}</select></label><label>Rareza<select value={draft.rarity} onChange={e=>setDraft(d=>({...d,rarity:e.target.value as ItemDefinition['rarity']}))}>{rarities.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select></label></div>
+    <div className="inv-fields-2"><label>Categoría<select value={draft.category} onChange={e=>setDraft(d=>({...d,category:e.target.value as ItemCategory,equip_slot:null,damage_bonus:0,damage_dice_count:0,damage_die_sides:null,restore_amount:e.target.value==='objeto'?d.restore_amount:0}))}>{groups.map(g=><option key={g.id} value={g.id}>{g.title}</option>)}</select></label><label>Rareza<select value={draft.rarity} onChange={e=>setDraft(d=>({...d,rarity:e.target.value as ItemDefinition['rarity']}))}>{rarities.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select></label></div>
+    <details className="inv-edit-fold" open><summary>Equipamiento y bonificaciones de daño <ChevronDown size={18}/></summary>
+      <p className="hint">Las armas normalmente agregan daño fijo. Los dados adicionales son opcionales. Los atributos mejorados no se convierten automáticamente en daño.</p>
+      <div className="inv-fields-2"><label>Ranura al equipar<select value={draft.equip_slot||''} onChange={e=>setDraft(d=>({...d,equip_slot:e.target.value||null,restore_amount:e.target.value==='accesorio'?0:d.restore_amount}))}><option value="">{draft.category==='arma'?'Arma principal (predeterminada)':draft.category==='armadura'?'Armadura (predeterminada)':'No equipable'}</option>{(draft.category==='arma'?[['arma_principal','Arma principal'],['arma_secundaria','Arma secundaria']]:draft.category==='armadura'?[['armadura','Armadura'],['escudo','Escudo']]:draft.category==='objeto'?[['accesorio','Accesorio']]:[]).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+      <label>Daño fijo adicional (+ o −)<input type="number" min={-1000} max={1000} value={draft.damage_bonus} onChange={e=>setDraft(d=>({...d,damage_bonus:Number(e.target.value)}))}/></label></div>
+      <div className="inv-fields-2"><label>Dados extra (normalmente 0)<input type="number" min={0} max={10} value={draft.damage_dice_count} onChange={e=>setDraft(d=>({...d,damage_dice_count:Number(e.target.value),damage_die_sides:Number(e.target.value)>0?(d.damage_die_sides||4):null}))}/></label><label>Caras del dado adicional<select disabled={draft.damage_dice_count===0} value={draft.damage_die_sides||4} onChange={e=>setDraft(d=>({...d,damage_die_sides:Number(e.target.value)}))}>{[4,6,8,10,12,20].map(n=><option key={n} value={n}>d{n}</option>)}</select></label></div>
+     </details>
     <details className="inv-edit-fold" open><summary>Bonificaciones de atributos <ChevronDown size={18}/></summary><p className="hint">Las armas y armaduras suman sus valores al equiparse. Los objetos clave tienen su efecto mientras se posean. Introduce valores negativos para penalizaciones.</p>
      <div className="inv-bonus-grid">{attributes.map(a=><label key={a}>{a}<input type="number" min={-1000} max={1000} value={draft.bonuses[a]??0} onChange={e=>setDraft(d=>{const bonuses={...d.bonuses};const value=Number(e.target.value);if(value===0)delete bonuses[a];else bonuses[a]=value;return {...d,bonuses}})}/></label>)}</div>
     </details>
@@ -58,7 +65,7 @@ function InventoryItem({item,owned,busy,isStaff,onEquip,onUse,onGrant,onEdit,hid
 }){
  const [quantity,setQuantity]=useState('1')
  const bonusText=Object.entries(item.bonuses||{}).filter(([,v])=>v!==0).map(([k,v])=>`${v>0?'+':''}${v} ${k}`)
- const equipable=item.category==='arma'||item.category==='armadura'
+ const equipable=!!equippedSlot(item)
  const canUse=item.category==='objeto'&&item.is_active&&item.restore_amount>0&&!!item.use_resource
  const amount=Number(quantity)
  const valid=Number.isSafeInteger(amount)&&amount>=1&&amount<=100000
@@ -67,6 +74,8 @@ function InventoryItem({item,owned,busy,isStaff,onEquip,onUse,onGrant,onEdit,hid
   {item.description&&<p className="inv-item-description">{item.description}</p>}
   {bonusText.length>0&&<div className="inv-bonus-tags">{bonusText.map(x=><span key={x}><Sparkles size={13}/>{x}</span>)}</div>}
   {item.passive_text&&<p className="inv-item-passive"><Sparkles size={15}/><span>{item.passive_text}</span></p>}
+  {(item.damage_bonus!==0||item.damage_dice_count>0)&&<p className="inv-helper"><Sword size={15}/> Daño {item.damage_bonus!==0?`${item.damage_bonus>0?'+':''}${item.damage_bonus}`:''}{item.damage_dice_count>0?` ${item.damage_dice_count}d${item.damage_die_sides} adicional`:''}</p>}
+  {equippedSlot(item)&&<small className="inv-helper">Ranura: {({arma_principal:'Arma principal',arma_secundaria:'Arma secundaria',armadura:'Armadura',escudo:'Escudo',accesorio:'Accesorio'} as Record<string,string>)[equippedSlot(item)!]||'Equipo'}</small>}
   {item.category==='clave'&&<small className="inv-helper">Las bonificaciones y pasivas de objetos clave se activan al poseerlos.</small>}
   {canUse&&item.restore_amount>0&&<small className="inv-helper">Recupera {fmt(item.restore_amount)} de {item.use_resource}.</small>}
   <div className="inv-actions inv-item-actions">
@@ -93,7 +102,7 @@ export function InventoryView({character,characters,isStaff,busy,items,owned,wal
  return <div className="stack inv-page">
   {!compactStaff&&<div className="page-heading inv-heading"><div><span className="overline">PERTENENCIAS DEL AVENTURERO</span><h1>Inventario</h1><p>Equipo, objetos, tesoros y dinero de tu personaje.</p></div>{isStaff&&<button className="inv-button primary" type="button" onClick={()=>setEditor(null)}><Plus size={17}/> Crear objeto</button>}</div>}
   {isStaff&&!compactStaff&&<div className="card inv-character-bar"><label><span>Personaje administrado</span><select value={character.id} onChange={e=>onSelectCharacter(e.target.value)}>{characters.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><span className="hint">Puedes asignar o retirar objetos individualmente; el jugador no puede editar cantidades ni dinero.</span></div>}
-  <div className="inv-overview"><div><Package size={21}/><span><strong>{fmt(ownedItems.length)}</strong><small>Tipos de objetos</small></span></div><div><Shield size={21}/><span><strong>{owned.filter(o=>o.equipped).length}/2</strong><small>Piezas equipadas</small></span></div><div><Coins size={21}/><span><strong>{fmt(funds.gold)} oro</strong><small>{fmt(funds.silver)} plata · {fmt(funds.copper)} cobre</small></span></div></div>
+  <div className="inv-overview"><div><Package size={21}/><span><strong>{fmt(ownedItems.length)}</strong><small>Tipos de objetos</small></span></div><div><Shield size={21}/><span><strong>{owned.filter(o=>o.equipped).length}</strong><small>Piezas equipadas</small></span></div><div><Coins size={21}/><span><strong>{fmt(funds.gold)} oro</strong><small>{fmt(funds.silver)} plata · {fmt(funds.copper)} cobre</small></span></div></div>
   <details className="card inv-fold" open><summary><span><Wallet size={21}/><strong>Bolsa de monedas</strong><small>Oro, plata y cobre</small></span><ChevronDown size={21}/></summary><div className="inv-fold-body"><div className="inv-money-grid"><div><Crown size={20}/><strong>{fmt(funds.gold)}</strong><small>Oro</small></div><div><Gem size={20}/><strong>{fmt(funds.silver)}</strong><small>Plata</small></div><div><Coins size={20}/><strong>{fmt(funds.copper)}</strong><small>Cobre</small></div></div><p className="hint">Equivalencia: 1 oro = 10 plata = 100 cobre; 1 plata = 10 cobre. El dinero pertenece al personaje.</p>
    {isStaff&&<form className="inv-money-editor" onSubmit={e=>void moneySubmit(e)}><div className="inv-fields-3"><label>Oro<input type="number" min={0} value={gold} onChange={e=>setGold(e.target.value)}/></label><label>Plata<input type="number" min={0} value={silver} onChange={e=>setSilver(e.target.value)}/></label><label>Cobre<input type="number" min={0} value={copper} onChange={e=>setCopper(e.target.value)}/></label></div><div className="inv-fields-2"><label>Movimiento<select value={moneyOperation} onChange={e=>setMoneyOperation(e.target.value as 'dar'|'retirar')}><option value="dar">Añadir</option><option value="retirar">Retirar</option></select></label><label>Motivo<input maxLength={200} value={reason} onChange={e=>setReason(e.target.value)}/></label></div><button className="inv-button primary" disabled={busy||!validMoney}>{moneyOperation==='dar'?'Entregar monedas':'Retirar monedas'}</button></form>}
   </div></details>
