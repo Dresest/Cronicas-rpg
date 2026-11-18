@@ -6,6 +6,11 @@ const CATEGORIES = ['arma','armadura','objeto','clave'];
 const RARITIES = ['comun','poco_comun','raro','epico','legendario'];
 const P = { 'Cache-Control':'no-store, max-age=0','X-Content-Type-Options':'nosniff' };
 const send=(res,status,body)=>res.status(status).json(body);
+class GenerationFailure extends Error {
+  constructor(status,payload) { super(payload.error);this.status=status;this.payload=payload; }
+}
+const validUUID=value=>typeof value==='string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const text=(value,max)=>typeof value==='string'?value.trim().slice(0,max):'';
 const clamp=(v,min,max)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.trunc(Number(v)))):min;
 const choose=(v,arr,fallback)=>arr.includes(v)?v:fallback;
@@ -76,6 +81,17 @@ async function jsonFetch(url,options){
   return {status:response.status,ok:response.ok,json};
 }
 
+async function settleReservation(url,serviceKey,reservationId,success) {
+  const response=await jsonFetch(url+'/rest/v1/rpc/settle_ai_generation',{
+    method:'POST',
+    headers:{apikey:serviceKey,Authorization:'Bearer '+serviceKey,
+             Accept:'application/json','Content-Type':'application/json'},
+    body:JSON.stringify({p_reservation_id:reservationId,p_success:success})
+  });
+  const desired=success?'completed':'released';
+  return response.ok && response.json?.ok===true && response.json.status===desired;
+}
+
 export async function generate(req,res,forcedKind=null){
   for(const [k,v] of Object.entries(P))res.setHeader(k,v);
   if(req.method!=='POST')return send(res,405,{error:'Método no permitido.'});
@@ -85,7 +101,9 @@ export async function generate(req,res,forcedKind=null){
   const supabaseUrl=(process.env.VITE_SUPABASE_URL||'').replace(/\/$/,'');
   const supabaseKey=process.env.VITE_SUPABASE_ANON_KEY||'';
   const gatewayKey=process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN||'';
-  if(!supabaseUrl||!supabaseKey||!gatewayKey)return send(res,503,{error:'Servicio de IA no configurado.'});
+  const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY||'';
+  if(!supabaseUrl||!supabaseKey||!gatewayKey||!serviceKey)
+    return send(res,503,{error:'Servicio de IA no configurado.'});
   const body=req.body;
   if(!body||typeof body!=='object'||Array.isArray(body))return send(res,400,{error:'Solicitud inválida.'});
   const kind=forcedKind||body.kind;
@@ -97,6 +115,9 @@ export async function generate(req,res,forcedKind=null){
   const token=/^Bearer\s+([a-zA-Z0-9_.-]+)$/.exec(authorization)?.[1];
   if(!token)return send(res,401,{error:'Debes iniciar sesión.'});
   const headers={apikey:supabaseKey,Authorization:'Bearer '+token,Accept:'application/json'};
+  const serviceHeaders={apikey:serviceKey,Authorization:'Bearer '+serviceKey,
+                        Accept:'application/json','Content-Type':'application/json'};
+  let reservationId=null;
   try{
     const user=await jsonFetch(supabaseUrl+'/auth/v1/user',{method:'GET',headers});
     if(!user.ok||!user.json?.id)return send(res,401,{error:'Tu sesión expiró. Inicia sesión nuevamente.'});
@@ -104,7 +125,8 @@ export async function generate(req,res,forcedKind=null){
     // RPC definida por sql/ai_generation_quota.sql: valida rol y reserva cuota mensualmente.
     // No se hace ninguna solicitud al modelo si la reserva falla.
     const quota=await jsonFetch(supabaseUrl+'/rest/v1/rpc/reserve_ai_generation',{
-      method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({p_kind:kind})
+      method:'POST',headers:serviceHeaders,
+      body:JSON.stringify({p_user_id:user.json.id,p_kind:kind})
     });
     if(!quota.ok||!quota.json||typeof quota.json.allowed!=='boolean'){
       return send(res,503,{error:'El control de créditos todavía no está disponible.'});
@@ -113,6 +135,10 @@ export async function generate(req,res,forcedKind=null){
       if(quota.json.reason==='FORBIDDEN')return send(res,403,{error:'No tienes permiso para generar contenido.'});
       return send(res,402,{code:'CREDITS_EXHAUSTED',error:'Créditos de IA agotados. Inténtalo en el próximo período.'});
     }
+    if(!validUUID(quota.json.reservation_id)){
+      throw new GenerationFailure(503,{error:'No se pudo confirmar la reserva de IA.'});
+    }
+    reservationId=quota.json.reservation_id;
 
     const schema=kind==='item'?ITEM_SCHEMA:SKILL_SCHEMA;
     const instruction=kind==='item'
@@ -128,17 +154,34 @@ export async function generate(req,res,forcedKind=null){
         response_format:{type:'json_schema',json_schema:{name:'rpg_'+kind,strict:true,schema}}
       })
     });
-    if(gateway.status===402)return send(res,402,{code:'CREDITS_EXHAUSTED',error:'Créditos de IA agotados.'});
-    if(gateway.status===429)return send(res,429,{error:'Demasiadas solicitudes. Inténtalo nuevamente.'});
-    if(!gateway.ok)return send(res,502,{error:'No se pudo generar el contenido.'});
+    if(gateway.status===402)throw new GenerationFailure(402,{code:'CREDITS_EXHAUSTED',error:'Créditos de IA agotados.'});
+    if(gateway.status===429)throw new GenerationFailure(429,{error:'Demasiadas solicitudes. Inténtalo nuevamente.'});
+    if(!gateway.ok)throw new GenerationFailure(502,{error:'No se pudo generar el contenido.'});
     const raw=gateway.json?.choices?.[0]?.message?.content;
-    if(typeof raw!=='string'||raw.length>12000)return send(res,502,{error:'Respuesta de IA inválida.'});
+    if(typeof raw!=='string'||raw.length>12000)throw new GenerationFailure(502,{error:'Respuesta de IA inválida.'});
     let value;
-    try{value=JSON.parse(raw)}catch{return send(res,502,{error:'Respuesta de IA inválida.'})}
+    try{value=JSON.parse(raw)}catch{throw new GenerationFailure(502,{error:'Respuesta de IA inválida.'})}
     const result=kind==='item'?normalizeItem(value):normalizeSkill(value);
+    // Confirmar antes de entregar contenido: un intento exitoso conserva su crédito.
+    const confirmed=await settleReservation(supabaseUrl,serviceKey,reservationId,true);
+    if(!confirmed)throw new GenerationFailure(503,{error:'No se pudo confirmar la generación.'});
+    reservationId=null;
     return send(res,200,{[kind]:result});
   }catch(error){
-    // No revelar detalles de auth, tokens, prompts ni respuestas de IA.
+    if(reservationId){
+      try{
+        const released=await settleReservation(supabaseUrl,serviceKey,reservationId,false);
+        if(!released){
+          console.error('RPG IA quota refund pending');
+          return send(res,503,{error:'La solicitud falló y su cupo se regularizará automáticamente.'});
+        }
+      }catch{
+        console.error('RPG IA quota refund pending');
+        return send(res,503,{error:'La solicitud falló y su cupo se regularizará automáticamente.'});
+      }
+    }
+    if(error instanceof GenerationFailure)return send(res,error.status,error.payload);
+    // No revelar tokens, prompts ni respuestas de IA en logs.
     console.error('RPG IA request failed:',error instanceof Error?error.name:'unknown');
     return send(res,503,{error:'El servicio de IA no está disponible.'});
   }

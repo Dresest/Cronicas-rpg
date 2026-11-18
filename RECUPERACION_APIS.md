@@ -1,38 +1,27 @@
-# Recuperación de API — revisión del 18 de noviembre de 2026
+# Generación con IA: créditos protegidos contra fallos
 
-## Avance
-- `api/generate-rpg.js`, `api/generate-item.js`: **implementaciones nuevas en rama de desarrollo**, basadas en el contrato observado en el JS de producción, NO copias fieles del servidor anterior.
-- `api/lib/generator-core.js`: autenticación mediante Supabase Auth; reserva obligatoria de cuota; llamadas al AI Gateway de Vercel (Qwen 3 32B), respuesta JSON de objeto o habilidad compatible con el cliente.
-- `sql/ai_generation_quota.sql`: migración propuesta, **NO aplicada** en la base de datos. El límite de 5 intentos por tipo/mes/usuario es un valor provisional y se debe revisar.
-- La función está **deshabilitada por defecto** (`AI_GENERATION_ENABLED` no establecido). Sin migración ni credenciales de gateway, responde 503 sin gastar créditos.
-- Restricción provisional: roles DM y `adminInformatico`. Antes de publicar, confirmar que los jugadores no necesiten generar directamente.
-- Se añade prueba sin red para autenticación, cuota, tipos, errores y contrato de respuesta.
+**Estado:** implementación de prueba (18-11-2026). No aplicada a Supabase ni Vercel de producción.
 
-## Rutas y configuración
-- `/api/generate-rpg` recibe `POST {kind:'item'|'skill',prompt:string}` con token Bearer de Supabase.
-- `/api/generate-item` queda como compatibilidad con clientes antiguos.
-- `/api/database-health` funciona como monitor con cron diario 09:00 UTC.
-- `vercel.json` excluye API y assets de la regla SPA.
+## Protocolo de crédito
+1. El usuario inicia sesión y solicita una generación.
+2. Vercel verifica el JWT de Supabase; solo después usa su credencial **privada de servicio** para reservar un crédito en `public.reserve_ai_generation(p_user_id,p_kind)`.
+3. La función SQL verifica que el perfil sea DM o `adminInformatico`, limita a 5 reservas por tipo y mes (cuota aún provisional), y devuelve un identificador único de reserva.
+4. Se llama a AI Gateway. Si retorna un objeto o habilidad válido, Vercel invoca `settle_ai_generation(reservation_id,true)` y **confirma el crédito** antes de entregar el resultado.
+5. Si la IA devuelve error HTTP (402/429/502), JSON inválido o falla la conexión, Vercel invoca `settle_ai_generation(reservation_id,false)`: **libera el crédito**. Las llamadas de liquidación son idempotentes: no se devuelve dos veces el mismo crédito.
+6. Si el servidor muere antes de finalizar, las reservas pendientes de más de **5 minutos** se recuperan automáticamente la próxima vez que ese usuario reserve contenido del mismo tipo y período. No se requieren tareas recurrentes.
+7. Si falla la operación de devolución, se responde que la regularización está pendiente, **sin afirmar falsamente que el crédito ya fue reembolsado**.
 
-## Condiciones que impiden despliegue todavía
-1. **Autorización y créditos originales:** no se recuperó su lógica completa, solo la interfaz. Requiere validación de reglas con el usuario y presupuesto de AI Gateway.
-2. **SQL de cuotas pendiente:** no se ha desplegado ni validado en una base de prueba.
-3. **IA real:** ninguna solicitud al modelo se ha ejecutado. Son únicamente pruebas con respuestas simuladas.
-4. **Frontend:** se recuperaron botones «Crear con IA» en objetos y habilidades, con vista previa editable, pero falta comparar y probar el resto del flujo con producción.
-5. **Pruebas funcionales:** pendientes en vista previa de Vercel antes de cualquier publicación.
+## Autorización y confidencialidad
+- El navegador **no tiene** permiso `EXECUTE` para reservar o liquidar créditos.
+- Ambas funciones están en `public` solo para recibir solicitudes REST de servidor, con `SECURITY DEFINER`, `search_path=''`, y `EXECUTE` concedido únicamente a `service_role`.
+- Las tablas `private.ai_generation_usage` y `private.ai_generation_reservations` tienen RLS habilitada; no se conceden privilegios de lectura/escritura al navegador.
+- La variable `SUPABASE_SERVICE_ROLE_KEY` **no** debe existir con prefijo `VITE_` y solo debe configurarse en Vercel como secreto.
+- Los costos reales del proveedor pueden existir aunque el crédito de juego se devuelva, porque son contabilidades distintas.
 
-**No publicar sobre producción ni conectar Vercel automáticamente hasta resolver estos puntos.**
+## Pruebas
+- Tests Node con fetch simulado: sesión válida/inválida, reserva, generación, confirmación, error de Gateway, devolución y confirmaciones repetidas.
+- Tests SQL en PostgreSQL 16 aislado: límite, liberación idempotente, reserva huérfana, separación por tipo, permisos DM/admin, rechazo de jugadores y anonimato.
+- Compilación y pruebas de los tres roles mediante Chrome/Playwright, con datos ficticios.
 
-## Barrera de despliegue
-
-La configuración `vercel.json` ejecuta `npm run build:production`, que exige `RPG_RELEASE_APPROVED=true` y todos los módulos de servidor. Sin esa autorización explícita el despliegue falla antes de publicarse, incluso si se vincula GitHub accidentalmente. La CI de desarrollo continúa compilando con `npm run build` para permitir pruebas sin habilitar producción.
-
-## Visibilidad de IA por entorno
-
-Los botones «Crear con IA» solo aparecen al activar **`VITE_AI_GENERATION_ENABLED=true`**. El endpoint requiere también **`AI_GENERATION_ENABLED=true`**. Ambas variables están desactivadas por defecto para que las vistas previas no muestren botones inoperativos. La guardia de publicación exige ambas habilitadas cuando `RPG_RELEASE_APPROVED=true`, evitando perder las funciones de IA al sustituir producción.
-
-## Reglas de compatibilidad del catálogo
-
-La normalización del generador se contrastó con las restricciones de las tablas reales de Supabase: las armas no combinan bonificaciones de atributo y daño fijo; solo los objetos consumibles restauran recursos; una habilidad pasiva no requiere recursos. Las pruebas simulan respuestas incompatibles de IA y verifican su transformación a borradores válidos. Se agregó además una prueba SQL del rol `adminInformatico` en PostgreSQL temporal.
-
-**Limitación pendiente:** la cuota actual cuenta *intentos autorizados*, porque se reserva antes de llamar al proveedor. Si el proveedor falla, el intento también queda contado. La publicación seguirá bloqueada hasta decidir explícitamente la política de reembolso de créditos o implementar una conciliación segura del servidor.
+## Límites
+**NO DESPLEGAR TODAVÍA.** La cuota de 5 por tipo/mes y los permisos deben confirmarse con las reglas de juego; falta presupuestar Gateway, definir la clave de servidor y verificar una vista previa real contra una base de pruebas. No se efectuaron llamadas reales a IA ni cambios a la base de producción.
