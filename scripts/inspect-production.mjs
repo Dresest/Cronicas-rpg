@@ -25,9 +25,9 @@ for(const path of assets){
     for(const term of ['generate-item','generate-rpg']){
       const i=body.indexOf(term);
       if(i<0)continue;
-      const around=body.slice(Math.max(0,i-240),Math.min(body.length,i+700));
+      const around=body.slice(Math.max(0,i-1200),Math.min(body.length,i+2200));
       const fields=[...around.matchAll(/(?:[{,]|\b)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g)].map(m=>m[1]);
-      keys.push({term,fieldNames:[...new Set(fields)].filter(k=>/^[a-zA-Z][a-zA-Z0-9_]*$/.test(k)).slice(0,28)});
+      keys.push({term,fieldNames:[...new Set(fields)].filter(k=>/^[a-zA-Z][a-zA-Z0-9_]*$/.test(k)).slice(0,80)});
     }
     console.log(JSON.stringify({path,status:response.status,bytes:body.length,contentType:ct.split(';')[0],matches,keys}));
     anyReadable=true;
