@@ -1,45 +1,24 @@
-# Recuperación de rutas de servidor — 18 de noviembre de 2026
+# Recuperación de API — revisión del 18 de noviembre de 2026
 
-## Monitor de Supabase recuperado funcionalmente
+## Avance
+- `api/generate-rpg.js`, `api/generate-item.js`: **implementaciones nuevas en rama de desarrollo**, basadas en el contrato observado en el JS de producción, NO copias fieles del servidor anterior.
+- `api/lib/generator-core.js`: autenticación mediante Supabase Auth; reserva obligatoria de cuota; llamadas al AI Gateway de Vercel (Qwen 3 32B), respuesta JSON de objeto o habilidad compatible con el cliente.
+- `sql/ai_generation_quota.sql`: migración propuesta, **NO aplicada** en la base de datos. El límite de 5 intentos por tipo/mes/usuario es un valor provisional y se debe revisar.
+- La función está **deshabilitada por defecto** (`AI_GENERATION_ENABLED` no establecido). Sin migración ni credenciales de gateway, responde 503 sin gastar créditos.
+- Restricción provisional: roles DM y `adminInformatico`. Antes de publicar, confirmar que los jugadores no necesiten generar directamente.
+- Se añade prueba sin red para autenticación, cuota, tipos, errores y contrato de respuesta.
 
-- `api/database-health.js` reconstruido a partir de la fuente parcial disponible en Vercel. Todas sus consultas son **GET** a `public.service_ping`; la prueba manual realiza una lectura y la invocación de Vercel Cron, cinco.
-- La programación verificada en el despliegue de producción es **`0 9 * * *` (todos los días, 09:00 UTC)**.
-- `vercel.json` evita que la regla SPA intercepte `/api/*` o `/assets/*`.
-- Hay pruebas automáticas de rutas, petición manual, cron, método no permitido y errores de Supabase; pasan en GitHub Actions.
-- Esto es una **reconstrucción funcional, no una copia byte a byte** de la fuente original.
+## Rutas y configuración
+- `/api/generate-rpg` recibe `POST {kind:'item'|'skill',prompt:string}` con token Bearer de Supabase.
+- `/api/generate-item` queda como compatibilidad con clientes antiguos.
+- `/api/database-health` funciona como monitor con cron diario 09:00 UTC.
+- `vercel.json` excluye API y assets de la regla SPA.
 
-## Contrato de IA verificado en el JavaScript público de producción
+## Condiciones que impiden despliegue todavía
+1. **Autorización y créditos originales:** no se recuperó su lógica completa, solo la interfaz. Requiere validación de reglas con el usuario y presupuesto de AI Gateway.
+2. **SQL de cuotas pendiente:** no se ha desplegado ni validado en una base de prueba.
+3. **IA real:** ninguna solicitud al modelo se ha ejecutado. Son únicamente pruebas con respuestas simuladas.
+4. **Frontend:** el respaldo React v1.3.4 carece de la interfaz de generación con IA añadida posteriormente, que aún debe reimplementarse/reconciliarse.
+5. **Pruebas funcionales:** pendientes en vista previa de Vercel antes de cualquier publicación.
 
-La interfaz publicada utiliza el siguiente contrato:
-
-```js
-fetch('/api/generate-rpg', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    Authorization: 'Bearer ' + session.access_token,
-  },
-  body: JSON.stringify({ kind, prompt }),
-});
-```
-
-- `kind` toma los valores `item` o `skill`.
-- Respuesta correcta: objeto JSON con la clave correspondiente, `{item: ...}` o `{skill: ...}`.
-- La interfaz reconoce el código `CREDITS_EXHAUSTED` y el estado HTTP **402** para créditos agotados, y **429** para demasiadas solicitudes.
-- El código cliente publicado comprueba que exista una sesión autenticada antes de llamar.
-- El despliegue aún incluye `api/generate-item.js`, aunque no encontramos una llamada a esa ruta en los módulos JavaScript inspeccionados.
-- La fuente parcial de `api/generate-rpg.js` muestra esquemas distintos para objetos y habilidades. La fuente parcial de `api/generate-item.js` indica el modelo `alibaba/qwen-3-32b`; todavía no puede afirmarse que la implementación vigente de `generate-rpg` utilice ese mismo modelo.
-
-## Pendiente de recuperar sin riesgo de regresión
-
-- **`api/generate-rpg.js` y `api/generate-item.js`:** Vercel solo devuelve fragmentos truncados de sus fuentes, por lo que su implementación completa y la autorización/cuotas internas no están verificadas.
-- La fuente React v1.3.4 es anterior al JS compilado actualmente desplegado; la presencia de UI de IA en producción está confirmada, pero falta incorporar esa parte al código fuente editable.
-- Realizar pruebas de vista previa (sin escrituras sobre personajes reales) antes de una publicación.
-
-**No sustituir la web actual con este repositorio hasta recuperar e integrar la IA.** Los archivos faltantes constituyen una barrera de publicación.
-
-## Seguridad
-
-No se han enviado tokens de sesión ni claves privadas a GitHub. Las inspecciones del JavaScript público solo registraron campos de contrato y fragmentos con tokens redactados. Git no contiene los datos de los personajes.
-
-El script `scripts/inspect-production.mjs` está disponible para revisiones manuales, pero ya no se ejecuta en cada push: evita consultas innecesarias a la web publicada.
+**No publicar sobre producción ni conectar Vercel automáticamente hasta resolver estos puntos.**
