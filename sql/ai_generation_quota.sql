@@ -65,7 +65,7 @@ BEGIN
   SELECT count(*)::integer INTO stale_count FROM stale;
   IF stale_count>0 THEN
     UPDATE private.ai_generation_usage
-       SET used_count=pg_catalog.greatest(used_count-stale_count,0)
+       SET used_count=greatest(used_count-stale_count,0)
      WHERE user_id=p_user_id AND kind=p_kind AND month_start=month_bucket;
   END IF;
 
@@ -123,7 +123,7 @@ BEGIN
 
   IF NOT p_success THEN
     UPDATE private.ai_generation_usage
-       SET used_count=pg_catalog.greatest(used_count-1,0)
+       SET used_count=greatest(used_count-1,0)
      WHERE user_id=current_reservation.user_id AND kind=current_reservation.kind
        AND month_start=current_reservation.month_start;
     IF NOT FOUND THEN
